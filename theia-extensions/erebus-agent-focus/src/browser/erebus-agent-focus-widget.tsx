@@ -11,6 +11,7 @@ import * as React from 'react';
 import { Message, ReactWidget } from '@theia/core/lib/browser';
 import { CommandService } from '@theia/core/lib/common/command';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
+import { ConversationSyncService } from '../common/conversation-sync-protocol';
 import { AgentFocusView } from './agent-focus-view';
 import { ErebusAgentFocusCommands } from './erebus-agent-focus-commands';
 
@@ -21,6 +22,9 @@ export class ErebusAgentFocusWidget extends ReactWidget {
 
     @inject(CommandService)
     protected readonly commandService: CommandService;
+
+    @inject(ConversationSyncService)
+    protected readonly conversationSyncService: ConversationSyncService;
 
     @postConstruct()
     protected init(): void {
@@ -40,7 +44,7 @@ export class ErebusAgentFocusWidget extends ReactWidget {
     }
 
     protected render(): React.ReactNode {
-        return <AgentFocusView onExitFocusMode={() => {
+        return <AgentFocusView conversationSyncService={this.conversationSyncService} onExitFocusMode={() => {
             this.commandService.executeCommand(ErebusAgentFocusCommands.LEAVE.id).catch(error => console.error(error));
         }} />;
     }

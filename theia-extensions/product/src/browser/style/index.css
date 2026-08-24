@@ -245,6 +245,49 @@ body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-custom-title::after {
     content: "IDE";
 }
 
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #erebus-agent-focus-titlebar-button {
+    position: absolute;
+    top: 4px;
+    right: 152px;
+    z-index: 10000;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 10px;
+    border: 1px solid rgba(149, 101, 255, 0.28);
+    border-radius: 7px;
+    color: #cdbdff;
+    background: rgba(149, 101, 255, 0.1);
+    font: inherit;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+    transition: color 100ms ease, border-color 100ms ease, background 100ms ease;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #erebus-agent-focus-titlebar-button .codicon {
+    font-size: 12px;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #erebus-agent-focus-titlebar-button:hover {
+    border-color: rgba(177, 140, 255, 0.58);
+    color: var(--erebus-ide-text);
+    background: var(--erebus-ide-accent-soft);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #erebus-agent-focus-titlebar-button:active {
+    background: rgba(149, 101, 255, 0.22);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #erebus-agent-focus-titlebar-button:focus-visible {
+    outline: 1px solid var(--erebus-ide-accent);
+    outline-offset: 1px;
+}
+
 body.erebus-ide-shell:not(.erebus-agent-focus-mode) #window-controls .control-button {
     color: var(--erebus-ide-muted);
     background: transparent;
@@ -788,6 +831,15 @@ body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-statusBar .element:ho
 }
 
 @media (max-width: 620px) {
+    #erebus-agent-focus-titlebar-button {
+        width: 28px;
+        padding: 0;
+    }
+
+    #erebus-agent-focus-titlebar-button .erebus-agent-focus-titlebar-label {
+        display: none;
+    }
+
     .erebus-welcome-main {
         width: calc(100% - 28px);
         padding-top: 30px;

@@ -7,30 +7,38 @@
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
-import * as os from 'os';
 import * as path from 'path';
 
 import { ElectronMainApplication, ElectronMainApplicationContribution } from '@theia/core/lib/electron-main/electron-main-application';
 
 import { injectable } from '@theia/core/shared/inversify';
-import { BrowserWindow } from '@theia/core/electron-shared/electron';
+import { app, BrowserWindow } from '@theia/core/electron-shared/electron';
 
 @injectable()
 export class IconContribution implements ElectronMainApplicationContribution {
 
-    onStart(application: ElectronMainApplication): void {
-        if (os.platform() === 'linux') {
-            const windowOptions = application.config.electron.windowOptions;
-            if (windowOptions && windowOptions.icon === undefined) {
-                // The window image is undefined. If the executable has an image set, this is used as a fallback.
-                // Since AppImage does not support this anymore via electron-builder, set an image for the linux platform.
-                windowOptions.icon = path.join(__dirname, '../../resources/icons/WindowIcon/512-512.png');
-                // also update any existing windows, e.g. the splashscreen
-                for (const window of BrowserWindow.getAllWindows()) {
-                    window.setIcon(path.join(__dirname, '../../resources/icons/WindowIcon/512-512.png'));
-                }
-            }
+    static readonly APPLICATION_NAME = 'Erebus';
+    static readonly APP_USER_MODEL_ID = 'com.fromanium.erebus';
 
+    onStart(application: ElectronMainApplication): void {
+        const iconPath = path.join(__dirname, '../../resources/icons/Erebus.png');
+
+        app.setName(IconContribution.APPLICATION_NAME);
+        if (process.platform === 'win32') {
+            app.setAppUserModelId(IconContribution.APP_USER_MODEL_ID);
+        }
+
+        const windowOptions = application.config.electron.windowOptions;
+        if (windowOptions) {
+            windowOptions.icon = iconPath;
+            windowOptions.title ??= IconContribution.APPLICATION_NAME;
+        }
+
+        for (const window of BrowserWindow.getAllWindows()) {
+            window.setIcon(iconPath);
+            if (!window.getTitle() || window.getTitle() === 'Electron') {
+                window.setTitle(IconContribution.APPLICATION_NAME);
+            }
         }
     }
 }

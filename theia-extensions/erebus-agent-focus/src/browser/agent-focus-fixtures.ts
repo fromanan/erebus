@@ -35,6 +35,7 @@ export const WORKFLOWS: Array<{ kind: WorkflowKind; icon: string; description: s
 export const SEED_SESSIONS: FocusSession[] = [
     {
         id: 'agent-focus-polish',
+        provider: 'erebus',
         workspace: 'Erebus',
         title: 'Agent Focus polish',
         summary: 'Refined the chat-first shell and violet color system',
@@ -109,6 +110,7 @@ export const SEED_SESSIONS: FocusSession[] = [
     },
     {
         id: 'terminal-approval',
+        provider: 'erebus',
         workspace: 'Erebus',
         title: 'Package the Windows preview',
         summary: 'Waiting to run the unsigned packaging command',
@@ -148,6 +150,7 @@ export const SEED_SESSIONS: FocusSession[] = [
     },
     {
         id: 'indexing-worker',
+        provider: 'erebus',
         workspace: 'Nightfall API',
         title: 'Trace indexing worker stalls',
         summary: 'Reading queue ownership and retry behavior',
@@ -187,6 +190,7 @@ export const SEED_SESSIONS: FocusSession[] = [
     },
     {
         id: 'command-palette',
+        provider: 'erebus',
         workspace: 'Nightfall API',
         title: 'Command palette accessibility',
         summary: 'Audit complete with seven recommendations',

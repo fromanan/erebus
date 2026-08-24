@@ -11,7 +11,8 @@
   ],
   "theiaExtensions": [
     {
-      "frontend": "lib/browser/erebus-agent-focus-frontend-module"
+      "frontend": "lib/browser/erebus-agent-focus-frontend-module",
+      "backend": "lib/node/erebus-agent-focus-backend-module"
     }
   ],
   "dependencies": {

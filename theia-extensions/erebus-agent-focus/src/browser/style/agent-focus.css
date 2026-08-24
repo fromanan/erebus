@@ -269,14 +269,14 @@ body.erebus-agent-focus-mode #theia-top-panel {
 .erebus-focus-workspace {
     position: relative;
     display: grid;
-    grid-template-columns: 290px minmax(420px, 1fr);
+    grid-template-columns: var(--erebus-rail-width, 290px) minmax(420px, 1fr);
     min-width: 0;
     min-height: 0;
     overflow: hidden;
 }
 
 .erebus-focus-root.context-open .erebus-focus-workspace {
-    grid-template-columns: 290px minmax(420px, 1fr) minmax(300px, 390px);
+    grid-template-columns: var(--erebus-rail-width, 290px) minmax(420px, 1fr) minmax(300px, 390px);
 }
 
 .erebus-focus-root.rail-collapsed .erebus-focus-workspace {
@@ -294,6 +294,40 @@ body.erebus-agent-focus-mode #theia-top-panel {
     min-height: 0;
     border-right: 1px solid var(--erebus-border-soft);
     background: var(--erebus-rail);
+}
+
+.erebus-rail-resizer {
+    position: absolute;
+    z-index: 11;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--erebus-rail-width, 290px) - 5px);
+    width: 10px;
+    padding: 0;
+    touch-action: none;
+    cursor: col-resize;
+}
+
+.erebus-rail-resizer::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 1px;
+    background: transparent;
+    content: "";
+    transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.erebus-rail-resizer:hover::after,
+.erebus-rail-resizer:focus-visible::after,
+.erebus-rail-resizer.is-active::after {
+    background: var(--erebus-accent);
+    box-shadow: 0 0 0 1px rgba(147, 98, 255, 0.18);
+}
+
+.erebus-rail-resizer:focus-visible {
+    outline: none;
 }
 
 .erebus-session-rail-content {
@@ -347,9 +381,22 @@ body.erebus-agent-focus-mode #theia-top-panel {
 .erebus-project-groups {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 14px;
 }
 
+.erebus-project-category {
+    padding: 7px 3px 3px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    transition: border-color 120ms ease, background 120ms ease;
+}
+
+.erebus-project-category.is-drop-target {
+    border-color: rgba(147, 98, 255, 0.7);
+    background: rgba(147, 98, 255, 0.09);
+}
+
+.erebus-category-heading,
 .erebus-project-heading {
     display: flex;
     align-items: center;
@@ -362,6 +409,7 @@ body.erebus-agent-focus-mode #theia-top-panel {
     font-weight: 650;
 }
 
+.erebus-category-heading > span,
 .erebus-project-heading > span {
     display: flex;
     align-items: center;
@@ -369,10 +417,19 @@ body.erebus-agent-focus-mode #theia-top-panel {
     min-width: 0;
 }
 
+.erebus-category-heading > span {
+    overflow: hidden;
+    color: var(--erebus-text-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erebus-category-heading .codicon,
 .erebus-project-heading .codicon {
     color: var(--erebus-muted);
 }
 
+.erebus-category-toggle,
 .erebus-project-toggle {
     display: inline-flex;
     flex: 0 0 auto;
@@ -388,12 +445,58 @@ body.erebus-agent-focus-mode #theia-top-panel {
     transition: color 120ms ease;
 }
 
+.erebus-category-toggle:hover,
 .erebus-project-toggle:hover {
     color: var(--erebus-text) !important;
 }
 
+.erebus-category-heading .erebus-category-toggle .codicon,
 .erebus-project-heading .erebus-project-toggle .codicon {
     color: inherit;
+}
+
+.erebus-category-projects {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    margin: 2px 0 5px 8px;
+    padding-left: 8px;
+    border-left: 1px solid var(--erebus-border-soft);
+}
+
+.erebus-category-projects.is-collapsed {
+    display: none;
+}
+
+.erebus-category-projects .erebus-project-heading {
+    padding-right: 5px;
+    padding-left: 5px;
+    font-size: 11px;
+}
+
+.erebus-empty-category {
+    padding: 7px 8px 9px;
+    color: var(--erebus-faint);
+    font-size: 10px;
+}
+
+.erebus-project-name {
+    overflow: hidden;
+    cursor: grab;
+}
+
+.erebus-project-name:active {
+    cursor: grabbing;
+}
+
+.erebus-project-name > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erebus-project-group.is-dragging {
+    opacity: 0.5;
 }
 
 .erebus-project-sessions {
@@ -404,6 +507,31 @@ body.erebus-agent-focus-mode #theia-top-panel {
 
 .erebus-project-sessions.is-collapsed {
     display: none;
+}
+
+.erebus-new-category {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: calc(100% - 10px);
+    min-height: 34px;
+    margin: 17px 5px 0;
+    padding: 0 10px;
+    border: 1px dashed #463d4f;
+    border-radius: 8px;
+    color: var(--erebus-muted) !important;
+    background: transparent;
+    font-size: 11px;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.erebus-new-category:hover,
+.erebus-new-category.is-drop-target {
+    border-color: rgba(147, 98, 255, 0.72);
+    color: #d6c4ff !important;
+    background: rgba(147, 98, 255, 0.08);
 }
 
 .erebus-session-row {
@@ -804,7 +932,8 @@ body.erebus-agent-focus-mode #theia-top-panel {
 .erebus-change-summary button,
 .erebus-review-actions button,
 .erebus-attention-card button,
-.erebus-new-session-dialog footer button {
+.erebus-new-session-dialog footer button,
+.erebus-new-category-dialog footer button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -821,7 +950,8 @@ body.erebus-agent-focus-mode #theia-top-panel {
 .erebus-change-summary button:hover,
 .erebus-review-actions button:hover,
 .erebus-attention-card button:hover,
-.erebus-new-session-dialog footer button:hover {
+.erebus-new-session-dialog footer button:hover,
+.erebus-new-category-dialog footer button:hover {
     color: var(--erebus-text) !important;
     background: var(--erebus-raised-hover);
 }
@@ -1403,7 +1533,8 @@ body.erebus-agent-focus-mode #theia-top-panel {
 }
 
 .erebus-attention-panel > header,
-.erebus-new-session-dialog > header {
+.erebus-new-session-dialog > header,
+.erebus-new-category-dialog > header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -1411,7 +1542,8 @@ body.erebus-agent-focus-mode #theia-top-panel {
 }
 
 .erebus-attention-panel h2,
-.erebus-new-session-dialog h2 {
+.erebus-new-session-dialog h2,
+.erebus-new-category-dialog h2 {
     margin: 3px 0 16px;
     font-size: 18px;
     font-weight: 650;
@@ -1509,6 +1641,69 @@ body.erebus-agent-focus-mode #theia-top-panel {
     box-shadow: var(--erebus-shadow);
 }
 
+.erebus-new-category-dialog {
+    width: min(430px, 100%);
+    padding: 23px;
+    border: 1px solid #55485f;
+    border-radius: 16px;
+    background: #211c27;
+    box-shadow: var(--erebus-shadow);
+}
+
+.erebus-category-project-preview {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 17px;
+    padding: 10px 11px;
+    border: 1px solid var(--erebus-border);
+    border-radius: 8px;
+    color: var(--erebus-muted);
+    background: #1a171e;
+    font-size: 11px;
+}
+
+.erebus-category-project-preview .codicon {
+    color: #b99aff;
+}
+
+.erebus-category-project-preview strong {
+    color: var(--erebus-text-secondary);
+}
+
+.erebus-category-name-field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    color: var(--erebus-text-secondary);
+    font-size: 11px;
+}
+
+.erebus-category-name-field input {
+    width: 100%;
+    height: 38px;
+    padding: 0 11px;
+    border: 1px solid var(--erebus-border);
+    border-radius: 8px;
+    color: var(--erebus-text);
+    background: #17131b;
+}
+
+.erebus-category-name-field input::placeholder {
+    color: var(--erebus-faint);
+}
+
+.erebus-category-name-field input[aria-invalid="true"] {
+    border-color: #b85e69;
+}
+
+.erebus-category-name-error {
+    display: block;
+    margin-top: 6px;
+    color: #ec8b96;
+    font-size: 10px;
+}
+
 .erebus-dialog-project {
     display: flex;
     align-items: center;
@@ -1598,7 +1793,8 @@ body.erebus-agent-focus-mode #theia-top-panel {
     color: var(--erebus-accent);
 }
 
-.erebus-new-session-dialog footer {
+.erebus-new-session-dialog footer,
+.erebus-new-category-dialog footer {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
@@ -1634,7 +1830,7 @@ body.erebus-agent-focus-mode #theia-top-panel {
 
 @media (max-width: 1120px) {
     .erebus-focus-root.context-open .erebus-focus-workspace {
-        grid-template-columns: 240px minmax(420px, 1fr) minmax(280px, 330px);
+        grid-template-columns: var(--erebus-rail-width, 290px) minmax(420px, 1fr) minmax(280px, 330px);
     }
 
     .erebus-focus-root.rail-collapsed.context-open .erebus-focus-workspace {
@@ -1662,6 +1858,10 @@ body.erebus-agent-focus-mode #theia-top-panel {
         width: min(390px, calc(100% - 68px));
         border-left-color: #4d4357;
         box-shadow: -20px 0 55px rgba(0, 0, 0, 0.3);
+    }
+
+    .erebus-rail-resizer {
+        display: none;
     }
 
     .erebus-topbar {

@@ -14,6 +14,18 @@ import { FocusMessage, FocusSession, SessionKind, SessionStatus, WorkflowKind } 
 
 const { useEffect, useMemo, useRef, useState } = React;
 
+const DEFAULT_RAIL_WIDTH = 290;
+const MIN_RAIL_WIDTH = 220;
+const MAX_RAIL_WIDTH = 520;
+const RAIL_WIDTH_STORAGE_KEY = 'erebus.agentFocus.railWidth';
+const PROJECT_CATEGORIES_STORAGE_KEY = 'erebus.agentFocus.projectCategories';
+
+interface ProjectCategory {
+    id: string;
+    name: string;
+    projects: string[];
+}
+
 export interface AgentFocusViewProps {
     onExitFocusMode: () => void;
 }
@@ -44,6 +56,44 @@ function AgentMark({ small = false }: { small?: boolean }): React.ReactElement {
         <span />
         <span />
     </span>;
+}
+
+function clampRailWidth(width: number): number {
+    return Math.min(MAX_RAIL_WIDTH, Math.max(MIN_RAIL_WIDTH, width));
+}
+
+function loadRailWidth(): number {
+    try {
+        const storedWidth = Number(window.localStorage.getItem(RAIL_WIDTH_STORAGE_KEY));
+        return Number.isFinite(storedWidth) && storedWidth > 0 ? clampRailWidth(storedWidth) : DEFAULT_RAIL_WIDTH;
+    } catch {
+        return DEFAULT_RAIL_WIDTH;
+    }
+}
+
+function loadProjectCategories(): ProjectCategory[] {
+    try {
+        const parsed: unknown = JSON.parse(window.localStorage.getItem(PROJECT_CATEGORIES_STORAGE_KEY) ?? '[]');
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+        return parsed.flatMap(candidate => {
+            if (!candidate || typeof candidate !== 'object') {
+                return [];
+            }
+            const record = candidate as Record<string, unknown>;
+            if (typeof record.id !== 'string' || typeof record.name !== 'string' || !Array.isArray(record.projects)) {
+                return [];
+            }
+            return [{
+                id: record.id,
+                name: record.name,
+                projects: record.projects.filter((project): project is string => typeof project === 'string')
+            }];
+        });
+    } catch {
+        return [];
+    }
 }
 
 function getElectronWindowApi(): TheiaCoreAPI | undefined {
@@ -162,14 +212,20 @@ function SessionRow({ session, active, collapsed, onSelect }: {
     </button>;
 }
 
-function SessionRail({ sessions, selectedId, collapsed, onSelect, onNewSession }: {
+function SessionRail({ sessions, categories, selectedId, collapsed, onSelect, onNewSession, onCreateCategory, onAssignProject }: {
     sessions: FocusSession[];
+    categories: ProjectCategory[];
     selectedId: string;
     collapsed: boolean;
     onSelect: (id: string) => void;
     onNewSession: () => void;
+    onCreateCategory: (project?: string) => void;
+    onAssignProject: (categoryId: string, project: string) => void;
 }): React.ReactElement {
     const [collapsedProjects, setCollapsedProjects] = useState<ReadonlySet<string>>(() => new Set());
+    const [collapsedCategories, setCollapsedCategories] = useState<ReadonlySet<string>>(() => new Set());
+    const [draggedProject, setDraggedProject] = useState<string | undefined>();
+    const [dropCategoryId, setDropCategoryId] = useState<string | undefined>();
     const groups = useMemo(() => {
         const result = new Map<string, FocusSession[]>();
         sessions.forEach(session => {
@@ -179,6 +235,8 @@ function SessionRail({ sessions, selectedId, collapsed, onSelect, onNewSession }
         });
         return Array.from(result.entries());
     }, [sessions]);
+    const categorizedProjects = useMemo(() => new Set(categories.flatMap(category => category.projects)), [categories]);
+    const ungroupedProjects = groups.filter(([workspace]) => !categorizedProjects.has(workspace));
 
     const toggleProject = (workspace: string): void => {
         setCollapsedProjects(current => {
@@ -192,6 +250,75 @@ function SessionRail({ sessions, selectedId, collapsed, onSelect, onNewSession }
         });
     };
 
+    const toggleCategory = (categoryId: string): void => {
+        setCollapsedCategories(current => {
+            const next = new Set(current);
+            if (next.has(categoryId)) {
+                next.delete(categoryId);
+            } else {
+                next.add(categoryId);
+            }
+            return next;
+        });
+    };
+
+    const beginProjectDrag = (event: React.DragEvent<HTMLElement>, workspace: string): void => {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', workspace);
+        setDraggedProject(workspace);
+    };
+
+    const endProjectDrag = (): void => {
+        setDraggedProject(undefined);
+        setDropCategoryId(undefined);
+    };
+
+    const getDroppedProject = (event: React.DragEvent<HTMLElement>): string | undefined =>
+        draggedProject ?? (event.dataTransfer.getData('text/plain') || undefined);
+
+    const renderProject = (workspace: string, workspaceSessions: FocusSession[], categoryName?: string): React.ReactElement => {
+        const projectCollapsed = collapsedProjects.has(workspace);
+        const projectSessionsId = `erebus-project-sessions-${workspaceSessions[0].id}`;
+        const projectLabel = categoryName ? `${categoryName} | ${workspace}` : workspace;
+        return <section className={`erebus-project-group${draggedProject === workspace ? ' is-dragging' : ''}`} key={workspace}>
+            {!collapsed && <div className='erebus-project-heading'>
+                <span
+                    className='erebus-project-name'
+                    draggable
+                    onDragStart={event => beginProjectDrag(event, workspace)}
+                    onDragEnd={endProjectDrag}
+                    title={`Drag ${workspace} into a category`}
+                >
+                    <Icon name='codicon-folder' />
+                    <span>{projectLabel}</span>
+                </span>
+                <button
+                    type='button'
+                    className='erebus-project-toggle'
+                    onClick={() => toggleProject(workspace)}
+                    aria-controls={projectSessionsId}
+                    aria-expanded={!projectCollapsed}
+                    aria-label={`${projectCollapsed ? 'Expand' : 'Collapse'} ${projectLabel} sessions`}
+                    title={`${projectCollapsed ? 'Expand' : 'Collapse'} ${projectLabel}`}
+                >
+                    <Icon name={projectCollapsed ? 'codicon-chevron-right' : 'codicon-chevron-down'} />
+                </button>
+            </div>}
+            <div id={projectSessionsId}
+                className={`erebus-project-sessions${projectCollapsed ? ' is-collapsed' : ''}`}
+                aria-hidden={projectCollapsed}
+            >
+                {workspaceSessions.map(session => <SessionRow
+                    key={session.id}
+                    session={session}
+                    active={selectedId === session.id}
+                    collapsed={collapsed}
+                    onSelect={() => onSelect(session.id)}
+                />)}
+            </div>
+        </section>;
+    };
+
     return <aside className={`erebus-session-rail${collapsed ? ' is-collapsed' : ''}`} aria-label='Agent sessions'>
         <div className='erebus-session-rail-content'>
             <button type='button' className='erebus-new-session' onClick={onNewSession} title='New session'>
@@ -202,39 +329,88 @@ function SessionRail({ sessions, selectedId, collapsed, onSelect, onNewSession }
             {!collapsed && <div className='erebus-rail-label'>Projects</div>}
 
             <div className='erebus-project-groups'>
-                {groups.map(([workspace, workspaceSessions]) => {
-                    const projectCollapsed = collapsedProjects.has(workspace);
-                    const projectSessionsId = `erebus-project-sessions-${workspaceSessions[0].id}`;
-                    return <section className='erebus-project-group' key={workspace}>
-                        {!collapsed && <div className='erebus-project-heading'>
-                            <span><Icon name='codicon-folder' />{workspace}</span>
+                {!collapsed && categories.map(category => {
+                    const categoryCollapsed = collapsedCategories.has(category.id);
+                    const categoryProjectsId = `erebus-category-projects-${category.id}`;
+                    const categoryProjects = category.projects.flatMap(project => {
+                        const projectGroup = groups.find(([workspace]) => workspace === project);
+                        return projectGroup ? [projectGroup] : [];
+                    });
+                    const dropActive = dropCategoryId === category.id;
+                    return <section
+                        className={`erebus-project-category${dropActive ? ' is-drop-target' : ''}`}
+                        key={category.id}
+                        onDragEnter={event => {
+                            event.preventDefault();
+                            setDropCategoryId(category.id);
+                        }}
+                        onDragOver={event => {
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = 'move';
+                        }}
+                        onDragLeave={event => {
+                            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                                setDropCategoryId(undefined);
+                            }
+                        }}
+                        onDrop={event => {
+                            event.preventDefault();
+                            const project = getDroppedProject(event);
+                            if (project) {
+                                onAssignProject(category.id, project);
+                            }
+                            endProjectDrag();
+                        }}
+                    >
+                        <div className='erebus-category-heading'>
+                            <span><Icon name={dropActive ? 'codicon-folder-opened' : 'codicon-folder'} />{category.name}</span>
                             <button
                                 type='button'
-                                className='erebus-project-toggle'
-                                onClick={() => toggleProject(workspace)}
-                                aria-controls={projectSessionsId}
-                                aria-expanded={!projectCollapsed}
-                                aria-label={`${projectCollapsed ? 'Expand' : 'Collapse'} ${workspace} sessions`}
-                                title={`${projectCollapsed ? 'Expand' : 'Collapse'} ${workspace}`}
+                                className='erebus-category-toggle'
+                                onClick={() => toggleCategory(category.id)}
+                                aria-controls={categoryProjectsId}
+                                aria-expanded={!categoryCollapsed}
+                                aria-label={`${categoryCollapsed ? 'Expand' : 'Collapse'} ${category.name}`}
+                                title={`${categoryCollapsed ? 'Expand' : 'Collapse'} ${category.name}`}
                             >
-                                <Icon name={projectCollapsed ? 'codicon-chevron-right' : 'codicon-chevron-down'} />
+                                <Icon name={categoryCollapsed ? 'codicon-chevron-right' : 'codicon-chevron-down'} />
                             </button>
-                        </div>}
-                        <div id={projectSessionsId}
-                            className={`erebus-project-sessions${projectCollapsed ? ' is-collapsed' : ''}`}
-                            aria-hidden={projectCollapsed}
+                        </div>
+                        <div
+                            id={categoryProjectsId}
+                            className={`erebus-category-projects${categoryCollapsed ? ' is-collapsed' : ''}`}
+                            aria-hidden={categoryCollapsed}
                         >
-                            {workspaceSessions.map(session => <SessionRow
-                                key={session.id}
-                                session={session}
-                                active={selectedId === session.id}
-                                collapsed={collapsed}
-                                onSelect={() => onSelect(session.id)}
-                            />)}
+                            {categoryProjects.length > 0
+                                ? categoryProjects.map(([workspace, workspaceSessions]) => renderProject(workspace, workspaceSessions, category.name))
+                                : <span className='erebus-empty-category'>Drag projects here</span>}
                         </div>
                     </section>;
                 })}
+                {ungroupedProjects.map(([workspace, workspaceSessions]) => renderProject(workspace, workspaceSessions))}
             </div>
+
+            {!collapsed && <button
+                type='button'
+                className={`erebus-new-category${draggedProject ? ' is-drop-target' : ''}`}
+                onClick={() => onCreateCategory()}
+                onDragOver={event => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                }}
+                onDrop={event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const project = getDroppedProject(event);
+                    if (project) {
+                        onCreateCategory(project);
+                    }
+                    endProjectDrag();
+                }}
+            >
+                <Icon name={draggedProject ? 'codicon-new-folder' : 'codicon-add'} />
+                {draggedProject ? 'Drop to create category' : 'New category'}
+            </button>}
         </div>
 
         <div className='erebus-profile'>
@@ -248,6 +424,61 @@ function SessionRail({ sessions, selectedId, collapsed, onSelect, onNewSession }
             </button>
         </div>
     </aside>;
+}
+
+function RailResizeHandle({ width, onResize }: { width: number; onResize: (width: number) => void }): React.ReactElement {
+    const stopResizeRef = useRef<(() => void) | undefined>();
+    const [dragging, setDragging] = useState(false);
+
+    useEffect(() => () => stopResizeRef.current?.(), []);
+
+    return <div
+        className={`erebus-rail-resizer${dragging ? ' is-active' : ''}`}
+        role='separator'
+        aria-label='Resize projects and conversation sections'
+        aria-orientation='vertical'
+        aria-valuemin={MIN_RAIL_WIDTH}
+        aria-valuemax={MAX_RAIL_WIDTH}
+        aria-valuenow={Math.round(width)}
+        tabIndex={0}
+        onPointerDown={event => {
+            if (event.button !== 0) {
+                return;
+            }
+            event.preventDefault();
+            stopResizeRef.current?.();
+            const startX = event.clientX;
+            const startWidth = width;
+            const move = (moveEvent: PointerEvent): void => onResize(startWidth + moveEvent.clientX - startX);
+            const stop = (): void => {
+                window.removeEventListener('pointermove', move);
+                window.removeEventListener('pointerup', stop);
+                window.removeEventListener('pointercancel', stop);
+                stopResizeRef.current = undefined;
+                setDragging(false);
+            };
+            stopResizeRef.current = stop;
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', stop);
+            window.addEventListener('pointercancel', stop);
+            setDragging(true);
+        }}
+        onKeyDown={event => {
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                onResize(width - 16);
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                onResize(width + 16);
+            } else if (event.key === 'Home') {
+                event.preventDefault();
+                onResize(MIN_RAIL_WIDTH);
+            } else if (event.key === 'End') {
+                event.preventDefault();
+                onResize(MAX_RAIL_WIDTH);
+            }
+        }}
+    />;
 }
 
 function ToolDisclosure({ count, expanded, onToggle }: { count: number; expanded: boolean; onToggle: () => void }): React.ReactElement {
@@ -537,6 +768,60 @@ function NewSessionDialog({ onClose, onCreate }: { onClose: () => void; onCreate
     </div>;
 }
 
+function NewCategoryDialog({ project, categoryNames, onClose, onCreate }: {
+    project?: string;
+    categoryNames: string[];
+    onClose: () => void;
+    onCreate: (name: string) => void;
+}): React.ReactElement {
+    const [name, setName] = useState('');
+    const trimmedName = name.trim();
+    const duplicateName = categoryNames.some(categoryName => categoryName.toLocaleLowerCase() === trimmedName.toLocaleLowerCase());
+    const canCreate = trimmedName.length > 0 && !duplicateName;
+
+    return <div className='erebus-dialog-backdrop' role='presentation' onMouseDown={event => {
+        if (event.target === event.currentTarget) {
+            onClose();
+        }
+    }}>
+        <form className='erebus-new-category-dialog' role='dialog' aria-modal='true' aria-labelledby='erebus-new-category-title'
+            onSubmit={event => {
+                event.preventDefault();
+                if (canCreate) {
+                    onCreate(trimmedName);
+                }
+            }}>
+            <header>
+                <div>
+                    <span className='erebus-eyebrow'>{project ? 'Organize this project' : 'Organize related projects'}</span>
+                    <h2 id='erebus-new-category-title'>New category</h2>
+                </div>
+                <button type='button' className='erebus-icon-button' onClick={onClose} aria-label='Close'><Icon name='codicon-close' /></button>
+            </header>
+            {project && <p className='erebus-category-project-preview'>
+                <Icon name='codicon-folder' />
+                <span><strong>{project}</strong> will be moved into this category.</span>
+            </p>}
+            <label className='erebus-category-name-field'>
+                <span>Category name</span>
+                <input
+                    autoFocus
+                    value={name}
+                    onChange={event => setName(event.currentTarget.value)}
+                    placeholder='For example, Platform'
+                    aria-invalid={duplicateName || undefined}
+                    aria-describedby={duplicateName ? 'erebus-category-name-error' : undefined}
+                />
+            </label>
+            {duplicateName && <span id='erebus-category-name-error' className='erebus-category-name-error'>That category already exists.</span>}
+            <footer>
+                <button type='button' onClick={onClose}>Cancel</button>
+                <button type='submit' className='erebus-primary-button' disabled={!canCreate}>Create category</button>
+            </footer>
+        </form>
+    </div>;
+}
+
 function TopBar({ session, railCollapsed, contextOpen, attentionCount, onToggleRail, onToggleContext, onToggleAttention, onExitFocusMode }: {
     session: FocusSession;
     railCollapsed: boolean;
@@ -588,6 +873,8 @@ function TopBar({ session, railCollapsed, contextOpen, attentionCount, onToggleR
 export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.ReactElement {
     const [sessions, setSessions] = useState<FocusSession[]>(SEED_SESSIONS);
     const [selectedId, setSelectedId] = useState(SEED_SESSIONS[0].id);
+    const [railWidth, setRailWidth] = useState(loadRailWidth);
+    const [categories, setCategories] = useState<ProjectCategory[]>(loadProjectCategories);
     const [railCollapsed, setRailCollapsed] = useState(() => {
         try {
             return window.localStorage.getItem('erebus.agentFocus.railCollapsed') === 'true';
@@ -599,6 +886,7 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
     const [contextTab, setContextTab] = useState<'context' | 'changes'>('context');
     const [attentionOpen, setAttentionOpen] = useState(false);
     const [newSessionOpen, setNewSessionOpen] = useState(false);
+    const [categoryDialog, setCategoryDialog] = useState<{ project?: string } | undefined>();
     const [composer, setComposer] = useState('');
     const [busy, setBusy] = useState(false);
     const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set(['focus-agent-2']));
@@ -615,6 +903,22 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
             // Persistence is optional in restricted browser contexts.
         }
     }, [railCollapsed]);
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(RAIL_WIDTH_STORAGE_KEY, String(railWidth));
+        } catch {
+            // Persistence is optional in restricted browser contexts.
+        }
+    }, [railWidth]);
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(PROJECT_CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+        } catch {
+            // Persistence is optional in restricted browser contexts.
+        }
+    }, [categories]);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ block: 'end' });
@@ -713,6 +1017,34 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
         setContextTab('context');
     };
 
+    const assignProjectToCategory = (categoryId: string, project: string): void => {
+        setCategories(current => current.map(category => ({
+            ...category,
+            projects: category.id === categoryId
+                ? [...category.projects.filter(candidate => candidate !== project), project]
+                : category.projects.filter(candidate => candidate !== project)
+        })));
+        const categoryName = categories.find(category => category.id === categoryId)?.name;
+        setToast(categoryName ? `${project} moved to ${categoryName}` : `${project} moved`);
+    };
+
+    const createCategory = (name: string): void => {
+        const project = categoryDialog?.project;
+        setCategories(current => [
+            ...current.map(category => ({
+                ...category,
+                projects: project ? category.projects.filter(candidate => candidate !== project) : category.projects
+            })),
+            {
+                id: `category-${Date.now()}`,
+                name,
+                projects: project ? [project] : []
+            }
+        ]);
+        setCategoryDialog(undefined);
+        setToast(project ? `${project} moved to ${name}` : `${name} category created`);
+    };
+
     const resolveAttention = (sessionId: string): void => {
         updateSession(sessionId, session => ({
             ...session,
@@ -733,7 +1065,10 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
         setToast('Next task started');
     };
 
-    return <div className={`erebus-focus-root${railCollapsed ? ' rail-collapsed' : ''}${contextOpen ? ' context-open' : ''}`}>
+    return <div
+        className={`erebus-focus-root${railCollapsed ? ' rail-collapsed' : ''}${contextOpen ? ' context-open' : ''}`}
+        style={{ '--erebus-rail-width': `${railWidth}px` } as React.CSSProperties}
+    >
         <TopBar
             session={selectedSession}
             railCollapsed={railCollapsed}
@@ -748,11 +1083,16 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
         <div className='erebus-focus-workspace'>
             <SessionRail
                 sessions={sessions}
+                categories={categories}
                 selectedId={selectedSession.id}
                 collapsed={railCollapsed}
                 onSelect={selectSession}
                 onNewSession={() => setNewSessionOpen(true)}
+                onCreateCategory={project => setCategoryDialog({ project })}
+                onAssignProject={assignProjectToCategory}
             />
+
+            {!railCollapsed && <RailResizeHandle width={railWidth} onResize={width => setRailWidth(clampRailWidth(width))} />}
 
             <main className='erebus-chat-panel'>
                 <div className='erebus-chat-scroll'>
@@ -800,6 +1140,12 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
         </div>
 
         {newSessionOpen && <NewSessionDialog onClose={() => setNewSessionOpen(false)} onCreate={createSession} />}
+        {categoryDialog && <NewCategoryDialog
+            project={categoryDialog.project}
+            categoryNames={categories.map(category => category.name)}
+            onClose={() => setCategoryDialog(undefined)}
+            onCreate={createCategory}
+        />}
         {toast && <div className='erebus-toast' role='status'><Icon name='codicon-check' />{toast}</div>}
     </div>;
 }

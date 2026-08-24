@@ -9,14 +9,20 @@
 
 import '../../src/browser/style/agent-focus.css';
 
-import { FrontendApplicationContribution, WidgetFactory } from '@theia/core/lib/browser';
+import { FrontendApplicationContribution, RemoteConnectionProvider, ServiceConnectionProvider, WidgetFactory } from '@theia/core/lib/browser';
 import { KeybindingContribution } from '@theia/core/lib/browser/keybinding';
 import { CommandContribution } from '@theia/core/lib/common/command';
 import { ContainerModule } from '@theia/core/shared/inversify';
+import { ConversationSyncService, ConversationSyncServicePath } from '../common/conversation-sync-protocol';
 import { ErebusAgentFocusContribution } from './erebus-agent-focus-contribution';
 import { ErebusAgentFocusWidget } from './erebus-agent-focus-widget';
 
 export default new ContainerModule(bind => {
+    bind(ConversationSyncService).toDynamicValue(context => {
+        const connection = context.container.get<ServiceConnectionProvider>(RemoteConnectionProvider);
+        return connection.createProxy<ConversationSyncService>(ConversationSyncServicePath);
+    }).inSingletonScope();
+
     bind(ErebusAgentFocusWidget).toSelf();
     bind(WidgetFactory).toDynamicValue(context => ({
         id: ErebusAgentFocusWidget.ID,

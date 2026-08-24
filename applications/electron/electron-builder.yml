@@ -19,7 +19,7 @@ directories:
 files:
   - src-gen
   - lib
-  - resources/icons/WindowIcon/512-512.png
+  - resources/icons/Erebus.png
   - resources/ErebusSplash.svg
   - scripts
   - "!**node_modules/**"
@@ -28,7 +28,7 @@ extraResources:
     to: app/plugins
 
 win:
-  icon: resources/icons/WindowsLauncherIcons/TheiaIDE.ico
+  icon: resources/icons/Erebus.ico
   target:
     - nsis
   publish:
@@ -66,9 +66,9 @@ nsis:
   menuCategory: true
   oneClick: false
   perMachine: false
-  installerHeaderIcon: resources/icons/WindowsLauncherIcons/TheiaIDE.ico
-  installerIcon: resources/icons/WindowsLauncherIcons/TheiaIDE.ico
-  uninstallerIcon: resources/icons/WindowsLauncherIcons/TheiaIDE.ico
+  installerHeaderIcon: resources/icons/Erebus.ico
+  installerIcon: resources/icons/Erebus.ico
+  uninstallerIcon: resources/icons/Erebus.ico
   installerSidebar: resources/icons/InstallerSidebarImage/164-314Windows.bmp
   uninstallerSidebar: resources/icons/InstallerSidebarImage/164-314Windows.bmp
   allowToChangeInstallationDirectory: true

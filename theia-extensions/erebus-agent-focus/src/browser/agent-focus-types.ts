@@ -11,6 +11,8 @@ export type SessionStatus = 'working' | 'attention' | 'paused' | 'complete';
 
 export type SessionKind = 'local' | 'cloud' | 'cli';
 
+export type SessionProvider = 'erebus' | 'codex' | 'kiro';
+
 export type MessageRole = 'user' | 'agent';
 
 export interface FocusMessage {
@@ -30,6 +32,8 @@ export interface SpecTask {
 
 export interface FocusSession {
     id: string;
+    provider: SessionProvider;
+    externalId?: string;
     workspace: string;
     title: string;
     summary: string;
@@ -43,6 +47,10 @@ export interface FocusSession {
     designNotes: string[];
     tasks: SpecTask[];
     changedFiles: string[];
+    sourceUpdatedAt?: string;
+    readOnly?: boolean;
+    loading?: boolean;
+    truncatedMessages?: number;
 }
 
 export type WorkflowKind = 'Spec' | 'Plan' | 'Bug Fix' | 'Quick Spec';

@@ -33,6 +33,7 @@
           "appUserModelId": "com.fromanium.erebus",
           "showWindowEarly": false,
           "windowOptions": {
+            "title": "Erebus",
             "resizable": true,
             "minimizable": true,
             "maximizable": true,

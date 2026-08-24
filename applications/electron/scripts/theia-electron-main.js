@@ -1,8 +1,29 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { app } = require('electron');
 const { copyBundledPlugins } = require('./appimage-helpers');
 const { handleVersionAndHelp } = require('./cli-usage');
+
+const erebusConfigDir = process.env.THEIA_CONFIG_DIR || path.join(os.homedir(), '.erebus');
+process.env.THEIA_CONFIG_DIR = erebusConfigDir;
+const erebusElectronUserDataDir = path.join(erebusConfigDir, 'electron');
+fs.mkdirSync(erebusElectronUserDataDir, { recursive: true });
+
+app.setName('Erebus');
+app.setPath('userData', erebusElectronUserDataDir);
+if (process.platform === 'win32') {
+    app.setAppUserModelId('com.fromanium.erebus');
+}
+process.title = 'Erebus';
+
+const runtimeIconPath = path.resolve(__dirname, '../resources/icons/Erebus.png');
+app.on('browser-window-created', (_event, window) => {
+    window.setIcon(runtimeIconPath);
+    if (!window.getTitle() || window.getTitle() === 'Electron') {
+        window.setTitle('Erebus');
+    }
+});
 
 // Handle --version and --help early, before loading the full electron stack.
 const packageJsonPath = path.resolve(__dirname, '../', 'package.json');
@@ -24,8 +45,7 @@ const bundledPluginsDir = isInsideAsar
 if (isAppImage) {
     // When running as AppImage, use a user-writable directory for the built-in plugins
     // The AppImage mount point (/tmp/.mount_*) is read-only
-    const configDir = process.env.THEIA_CONFIG_DIR || path.join(os.homedir(), '.theia-ide');
-    const userPluginsDir = path.join(configDir, 'builtInPlugins');
+    const userPluginsDir = path.join(erebusConfigDir, 'builtInPlugins');
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
     const currentVersion = packageJson.version;
 
