@@ -1,9 +1,9 @@
 {
   "private": true,
-  "name": "theia-ide-browser-app",
-  "description": "Eclipse Theia IDE browser product",
-  "productName": "Theia IDE",
-  "version": "1.74.100",
+  "name": "erebus-browser-app",
+  "description": "Erebus agent-first browser IDE",
+  "productName": "Erebus",
+  "version": "0.1.0",
   "license": "MIT",
   "author": "Eclipse Theia <theia-dev@eclipse.org>",
   "homepage": "https://github.com/eclipse-theia/theia-ide#readme",
@@ -21,7 +21,7 @@
   "theia": {
     "frontend": {
       "config": {
-        "applicationName": "Theia IDE",
+        "applicationName": "Erebus",
         "warnOnPotentiallyInsecureHostPattern": false,
         "preferences": {
           "toolbar.showToolbar": true,
@@ -36,7 +36,7 @@
         "warnOnPotentiallyInsecureHostPattern": false,
         "startupTimeout": -1,
         "resolveSystemPlugins": false,
-        "configurationFolder": ".theia-ide",
+        "configurationFolder": ".erebus",
         "frontendConnectionTimeout": 3000
       }
     },
@@ -119,6 +119,7 @@
     "fs-extra": "^9.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "theia-ide-erebus-agent-focus-ext": "0.1.0",
     "theia-ide-product-ext": "1.74.100"
   },
   "devDependencies": {

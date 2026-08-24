@@ -1,161 +1,88 @@
-<br/>
-<div id="theia-logo" align="center">
-    <br />
-    <img src="https://raw.githubusercontent.com/eclipse-theia/theia-ide/master/theia-extensions/product/src/browser/icons/TheiaIDE.png" alt="Theia Logo" width="300"/>
-    <h3>Eclipse Theia IDE</h3>
-</div>
+# Erebus
 
-<div id="badges" align="center">
+Erebus is an agent-first desktop IDE concept built on the actively maintained [Eclipse Theia IDE](https://github.com/eclipse-theia/theia-ide) Electron template. Its primary surface is a chat-first Agent Focus view for directing parallel sessions, handling blocking requests, and reviewing artifacts without making the code editor the center of every task.
 
-The Eclipse Theia IDE is built with this project.\
-Eclipse Theia IDE also serves as a template for building desktop-based products based on the Eclipse Theia platform.
+This repository currently implements the frontend experience. Session content and responses are local fixtures; Theia's real editor, terminal, source-control, extension, MCP, and AI-provider packages remain available underneath the focused surface.
 
-</div>
+## Why this foundation
 
-[![Installers](https://img.shields.io/badge/download-installers-blue.svg?style=flat-curved)](https://theia-ide.org/#theiaidedownload)
-[![Build](https://github.com/eclipse-theia/theia-ide/actions/workflows/build.yml/badge.svg?event=schedule)](https://github.com/eclipse-theia/theia-ide/actions/workflows/build.yml?query=event%3Aschedule)
-[![Next Build](https://github.com/eclipse-theia/theia-ide/actions/workflows/build-next-release.yml/badge.svg?branch=master)](https://github.com/eclipse-theia/theia-ide/actions/workflows/build-next-release.yml)
+- Theia IDE is an official desktop-product template rather than a one-off editor fork.
+- The checkout tracks Theia `1.75.0-next.34`, Electron `42.8.1`, React 18, and the current Theia AI packages.
+- It supports VS Code extensions through Open VSX while keeping the product shell fully customizable.
+- The previously popular Void VS Code fork is now deprecated. It remains useful as a reference, but is not a sound base for a new maintained product.
 
-[Main Theia Repository](https://github.com/eclipse-theia/theia)
+## Agent Focus frontend
 
-[Visit the Theia website](http://www.theia-ide.org) for more documentation: [Using the Theia IDE](https://theia-ide.org/docs/user_getting_started/), [Packaging Theia as a Desktop Product](https://theia-ide.org/docs/blueprint_documentation/).
+The Erebus surface follows a deliberate three-column hierarchy:
 
-## License
+1. **Sessions** — grouped local, cloud, and CLI work with working, attention, paused, and complete states.
+2. **Conversation** — the widest column, with tool-call disclosure, response metrics, change summaries, and a persistent composer.
+3. **Context** — an optional brief, task progress, changed-file list, and inline diff review.
 
-- [MIT](LICENSE)
+Implemented interactions include:
 
-## Trademark
+- switching and creating sessions;
+- collapsing the session rail to monogram tiles;
+- opening and resolving attention requests in place;
+- toggling context and changes views;
+- stepping through task progress;
+- submitting local prototype messages;
+- returning to the full Theia IDE and reopening Agent Focus with `Ctrl/Cmd+Alt+A`.
+- moving and resizing the frameless Electron window, plus dedicated minimize, maximize/restore, full-screen, and close controls.
 
-"Theia" is a trademark of the Eclipse Foundation
-<https://www.eclipse.org/theia>
+The main source is under [`theia-extensions/erebus-agent-focus`](theia-extensions/erebus-agent-focus). The color tokens live at the top of [`agent-focus.css`](theia-extensions/erebus-agent-focus/src/browser/style/agent-focus.css).
 
-## What is this?
+## Color system
 
-The Eclipse Theia IDE is a modern and open IDE for cloud and desktop. The Theia IDE is based on the [Theia platform](https://theia-ide.org).
-The Theia IDE is available as a [downloadable desktop application](https://theia-ide.org/#theiaidedownload). You can also try the latest version of the Theia IDE online. The online test version is limited to 30 minutes per session and hosted via Theia.cloud. Finally, we provide an [experimental Docker image](#docker) for hosting the Theia IDE online.
+| Role | Token | Value |
+| --- | --- | --- |
+| Session rail | `--erebus-rail` | `#0d0c10` |
+| Agent canvas | `--erebus-canvas` | `#1f1a24` |
+| Context panel | `--erebus-panel` | `#221d28` |
+| Raised controls | `--erebus-raised` | `#2d2733` |
+| Primary text | `--erebus-text` | `#f4f0f7` |
+| Secondary text | `--erebus-text-secondary` | `#c3bbc9` |
+| Agent accent | `--erebus-accent` | `#9362ff` |
+| Working state | `--erebus-positive` | `#67d4b1` |
+| Attention state | `--erebus-warning` | `#ffb454` |
 
-The Eclipse Theia IDE also serves as a **template** for building desktop-based products based on the Eclipse Theia platform, as well as to showcase Eclipse Theia capabilities. It is made up of a subset of existing Eclipse Theia features and extensions. [Documentation is available](https://theia-ide.org/docs/composing_applications/) to help you customize and build your own Eclipse Theia-based product.
+The palette is inspired by Kiro's warm near-black and violet Agent Focus presentation, but the Erebus mark, component styling, copy, data, and implementation are original.
 
-## Theia IDE vs Theia Blueprint
+## Prerequisites
 
-The Theia IDE has been rebranded from its original name “Theia Blueprint”. You can therefore assume the terms “Theia IDE” and “Theia Blueprint” to be synonymous.
+- Node.js `24.18.0` (recorded in `.node-version`; Node 22.22.2+ is also compatible with the toolchain)
+- Yarn Classic 1.x
+- On Windows, Visual Studio 2026 with the Desktop development with C++ workload
 
-## Development
+The repository pins `node-gyp` 13 because it includes Visual Studio 2026 detection. Earlier versions fail even when the C++ workload is installed. A local compatibility package uses Node's system-certificate API in place of the optional native `@vscode/windows-ca-certs` build, so the separate Spectre-mitigated C++ libraries are not required.
 
-### Requirements
+## Develop
 
-Please check Theia's [prerequisites](https://github.com/eclipse-theia/theia/blob/master/doc/Developing.md#prerequisites), and keep node versions aligned between Theia IDE and that of the referenced Theia version.
-
-### Documentation
-
-Documentation on how to package Theia as a Desktop Product may be found [here](https://theia-ide.org/docs/blueprint_documentation/).
-
-For adopters building their own products based on this template, see the [Adopter Guide](ADOPTER.md) for additional considerations.
-
-### Repository Structure
-
-- Root level configures mono-repo build with lerna
-- `applications` groups the different app targets
-  - `browser` contains a browser based version of Eclipse Theia IDE that may be packaged as a Docker image
-  - `electron` contains the electron app to package, packaging configuration, and E2E tests for the electron target.
-- `theia-extensions` groups the various custom theia extensions for the Eclipse Theia IDE
-  - `product` contains a Theia extension contributing the product branding (about dialogue and welcome page).
-  - `updater` contains a Theia extension contributing the update mechanism and corresponding UI elements (based on the electron updater).
-  - `launcher` contains a Theia extension contributing, for AppImage applications, the option to create a script that allows starting the Eclipse Theia IDE from the command line by calling the 'theia' command.
-- `patches` contains patches applied to upstream packages
-
-### Build
-
-For development and casual testing of the Eclipse Theia IDE, one can build it in "dev" mode. This permits building the IDE on systems with less resources, like a Raspberry Pi 4B with 4GB of RAM.
-
-NOTE: If manually building after updating dependencies or pulling to a newer commit, run `git clean -xfd` to help avoid runtime conflicts.
-
-```sh
-# Build "dev" version of the app. It's quicker, uses less resources,
-# but the front end app is not "minified"
-yarn && yarn build:dev && yarn download:plugins
+```powershell
+yarn install
+yarn build:extensions
+yarn electron build
+yarn download:plugins
+yarn electron start
 ```
 
-Production applications:
+`yarn download:plugins` installs the template's supported VS Code-compatible language and debugging extensions. Re-run it when the upstream plugin manifest changes.
 
-```sh
-# Build production version of the Eclipse Theia IDE app
-yarn && yarn build && yarn download:plugins
-```
+For a faster browser-only visual pass:
 
-### Package the Applications
-
-Currently we only produce packages for the Electron application.
-
-_If you are trying to compile for ARM on an ARM machine, you may want to follow [these steps](https://github.com/eclipse-theia/theia-ide/issues/690#issuecomment-4157768849) beforehand._
-
-```sh
-yarn package:applications
-# or
-yarn electron package
-```
-
-The packaged application is located in `applications/electron/dist`.
-
-### Create a Preview Electron Application (without packaging it)
-
-```sh
-yarn electron package:preview
-```
-
-The packaged application is located in `applications/electron/dist`.
-
-### Running E2E Tests on Electron
-
-The E2E tests are basic UI tests of the actual application, run against the preview of the packaged application.
-
-```sh
-yarn electron package:preview
-yarn electron test
-```
-
-### Running Browser app
-
-The browser app may be started with
-
-```sh
+```powershell
+yarn browser build
 yarn browser start
 ```
 
-Then connect to <http://localhost:3000/>.
+The Electron app opens directly into Agent Focus. Select **IDE** in the top-right to reveal the underlying workbench. Run **Erebus: Open Agent Focus** from the command palette, or press `Ctrl/Cmd+Alt+A`, to return.
 
-### Developing with Local Theia Framework
+## Architecture boundary
 
-To build and test the Theia IDE against a local development version of the Theia framework, see [docs/developing-with-local-theia.md](docs/developing-with-local-theia.md).
+`ErebusAgentFocusContribution` owns Theia integration: it creates the widget, maximizes the main workbench area, hides the editor tab while focused, and restores the IDE shell when leaving. `AgentFocusView` owns frontend state and interactions. Fixtures are isolated in `agent-focus-fixtures.ts` so a live session adapter can replace them without rewriting presentation components.
 
-### Troubleshooting
+The next integration step is to adapt Theia's chat/session services into the `FocusSession` and `FocusMessage` view models. That work is intentionally not simulated in the current frontend milestone.
 
-- [_"Don't expect that you can build app for all platforms on one platform."_](https://www.electron.build/multi-platform-build)
+## Upstream and license
 
-### Reporting Feature Requests and Bugs
-
-The features in the Eclipse Theia IDE are based on Theia and the included extensions/plugins. For bugs in Theia please consider opening an issue in the [Theia project on Github](https://github.com/eclipse-theia/theia/issues/new/choose).
-The Eclipse Theia IDE only packages existing functionality into a product and installers for the product. If you believe there is a mistake in packaging, something needs to be added to the packaging or the installers do not work properly, please [open an issue on Github](https://github.com/eclipse-theia/theia-ide/issues/new/choose) to let us know.
-
-### Linux (AppImage)
-
-The AppImage distribution of the Theia IDE requires FUSE (`libfuse2`) to be installed on the system. This is a general requirement of the AppImage format, not specific to Theia IDE. See the [AppImage documentation](https://docs.appimage.org/user-guide/troubleshooting/fuse.html) for details and installation instructions per distribution.
-
-### Docker
-
-The Docker image of the Theia IDE is currently in _experimental state_. It is built from the same sources and packages as the desktop version, but it is not part of the [preview test](https://github.com/eclipse-theia/theia-ide/blob/master/PUBLISHING.md#preview-testing-and-release-process-for-the-theia-ide).
-You can find a prebuilt Docker image of the IDE [here](https://github.com/eclipse-theia/theia-ide/pkgs/container/theia-ide%2Ftheia-ide).
-
-You can also create the Docker image for the Eclipse Theia IDE based on the browser app with the following build command:
-
-```sh
-docker build -t theia-ide -f browser.Dockerfile .
-```
-
-You may then run this with
-
-```sh
-docker run -p=3000:3000 --rm theia-ide
-```
-
-Then connect to <http://localhost:3000/>.
+Erebus began from the Eclipse Theia IDE template. The upstream copyright notices, MIT license, `NOTICE.md`, and third-party notices remain in the repository. New Erebus frontend code is provided under the same MIT license.

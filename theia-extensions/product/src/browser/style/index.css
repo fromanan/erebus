@@ -8,27 +8,32 @@
  ********************************************************************************/
 
 :root {
-    --theia-branding-logo: url(../icons/TheiaIDE.png);
+    --theia-branding-logo: url(../icons/Erebus.svg);
 }
 
 .theia-icon {
-    background-image: url("../icons/512-512.png");
+    background-image: url("../icons/Erebus.svg");
     background-position: center;
     background-repeat: no-repeat;
     background-size: contain;
 }
 
 body[data-theia-branding="next"] {
-    --theia-branding-logo: url(../icons/TheiaIDE-next.png);
+    --theia-branding-logo: url(../icons/Erebus.svg);
 }
 
 body[data-theia-branding="next"] .theia-icon {
-    background-image: url("../icons/512-512-next.png");
+    background-image: url("../icons/Erebus.svg");
 }
 
 .gs-blue-header {
     color: #5088e7;
     text-transform: capitalize;
+    font-weight: 600;
+}
+
+.gs-purple-header {
+    color: #9362ff;
     font-weight: 600;
 }
 
@@ -82,4 +87,729 @@ ul.theia-aboutExtensions {
     list-style-type: none;
     padding: 0;
     margin-left: 10px;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) {
+    --erebus-ide-void: #0b090d;
+    --erebus-ide-rail: #0f0d12;
+    --erebus-ide-surface: #151219;
+    --erebus-ide-surface-raised: #1c1821;
+    --erebus-ide-surface-hover: #24202a;
+    --erebus-ide-border: #302a37;
+    --erebus-ide-border-strong: #42394c;
+    --erebus-ide-text: #f2edf7;
+    --erebus-ide-text-secondary: #b9afc4;
+    --erebus-ide-muted: #84798f;
+    --erebus-ide-accent: #9565ff;
+    --erebus-ide-accent-soft: rgba(149, 101, 255, 0.16);
+    --erebus-ide-accent-strong: #7d49ef;
+    --erebus-ide-positive: #73d7bd;
+    --theia-foreground: var(--erebus-ide-text-secondary);
+    --theia-descriptionForeground: var(--erebus-ide-muted);
+    --theia-disabledForeground: #62596b;
+    --theia-focusBorder: var(--erebus-ide-accent);
+    --theia-editor-background: var(--erebus-ide-surface);
+    --theia-editor-foreground: var(--erebus-ide-text);
+    --theia-editorGroupHeader-tabsBackground: #121016;
+    --theia-editorGroup-border: var(--erebus-ide-border);
+    --theia-editorWidget-background: var(--erebus-ide-surface-raised);
+    --theia-sideBar-background: var(--erebus-ide-rail);
+    --theia-sideBar-foreground: var(--erebus-ide-text-secondary);
+    --theia-sideBar-border: var(--erebus-ide-border);
+    --theia-sideBarTitle-foreground: var(--erebus-ide-text);
+    --theia-activityBar-background: var(--erebus-ide-void);
+    --theia-activityBar-foreground: var(--erebus-ide-muted);
+    --theia-activityBar-activeForeground: var(--erebus-ide-text);
+    --theia-activityBar-activeBorder: var(--erebus-ide-accent);
+    --theia-panel-background: #121016;
+    --theia-panel-border: var(--erebus-ide-border);
+    --theia-tab-activeBackground: var(--erebus-ide-surface-raised);
+    --theia-tab-activeForeground: var(--erebus-ide-text);
+    --theia-tab-inactiveBackground: transparent;
+    --theia-tab-inactiveForeground: var(--erebus-ide-muted);
+    --theia-tab-unfocusedActiveBackground: #19151d;
+    --theia-tab-hoverBackground: var(--erebus-ide-surface-hover);
+    --theia-tab-border: transparent;
+    --theia-tab-activeBorderTop: var(--erebus-ide-accent);
+    --theia-titleBar-activeBackground: var(--erebus-ide-void);
+    --theia-titleBar-activeForeground: var(--erebus-ide-text);
+    --theia-titleBar-inactiveBackground: var(--erebus-ide-void);
+    --theia-toolbar-background: var(--erebus-ide-rail);
+    --theia-toolbar-hoverBackground: var(--erebus-ide-surface-hover);
+    --theia-statusBar-background: var(--erebus-ide-void);
+    --theia-statusBar-noFolderBackground: var(--erebus-ide-void);
+    --theia-statusBar-foreground: var(--erebus-ide-text-secondary);
+    --theia-list-hoverBackground: rgba(255, 255, 255, 0.04);
+    --theia-list-activeSelectionBackground: var(--erebus-ide-accent-soft);
+    --theia-list-activeSelectionForeground: var(--erebus-ide-text);
+    --theia-list-inactiveSelectionBackground: rgba(149, 101, 255, 0.09);
+    --theia-input-background: #100e13;
+    --theia-input-foreground: var(--erebus-ide-text);
+    --theia-input-border: var(--erebus-ide-border);
+    --theia-dropdown-background: var(--erebus-ide-surface-raised);
+    --theia-dropdown-border: var(--erebus-ide-border);
+    --theia-menu-background: #17131b;
+    --theia-menu-foreground: var(--erebus-ide-text-secondary);
+    --theia-menu-selectionBackground: var(--erebus-ide-accent-soft);
+    --theia-widget-shadow: rgba(0, 0, 0, 0.55);
+    --theia-editorGroup-dropBackground: rgba(149, 101, 255, 0.2);
+    color: var(--erebus-ide-text-secondary);
+    background: var(--erebus-ide-void);
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-app-shell {
+    color: var(--erebus-ide-text-secondary);
+    background: var(--erebus-ide-void);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-top-panel {
+    border-bottom: 1px solid var(--erebus-ide-border);
+    background: var(--erebus-ide-void);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.015);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) [id="theia:icon"] {
+    width: 26px;
+    height: 26px;
+    margin: 3px 4px 3px 8px;
+    padding: 4px;
+    border-radius: 7px;
+    background-color: rgba(149, 101, 255, 0.1);
+    background-size: 18px;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) [id="theia:menubar"] {
+    color: var(--erebus-ide-text-secondary);
+    background: transparent;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) [id="theia:menubar"] .lm-MenuBar-content {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    padding: 0 2px;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) [id="theia:menubar"] .lm-MenuBar-item {
+    height: 24px;
+    margin: 4px 0;
+    padding: 0 7px;
+    border-radius: 6px;
+    color: var(--erebus-ide-muted);
+    font-size: 11px;
+    line-height: 24px;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) [id="theia:menubar"] .lm-MenuBar-item:hover,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) [id="theia:menubar"] .lm-MenuBar-item.lm-mod-active {
+    color: var(--erebus-ide-text);
+    background: var(--erebus-ide-surface-hover);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-custom-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 28px !important;
+    max-height: 28px;
+    margin: 2px 0 !important;
+    padding: 0 8px;
+    bottom: auto !important;
+    color: var(--erebus-ide-text);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.015em;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-custom-title::before {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--erebus-ide-accent);
+    box-shadow: 0 0 10px rgba(149, 101, 255, 0.8);
+    content: "";
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-custom-title::after {
+    padding: 2px 6px;
+    border: 1px solid var(--erebus-ide-border);
+    border-radius: 5px;
+    color: var(--erebus-ide-muted);
+    background: rgba(255, 255, 255, 0.025);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    content: "IDE";
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #window-controls .control-button {
+    color: var(--erebus-ide-muted);
+    background: transparent;
+    transition: color 100ms ease, background 100ms ease;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #window-controls .control-button:hover {
+    color: var(--erebus-ide-text);
+    background: var(--erebus-ide-surface-hover);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #window-controls #close-button:hover {
+    color: #fff;
+    background: #c54b65;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #main-toolbar {
+    padding: 2px 8px;
+    border-bottom: 1px solid var(--erebus-ide-border);
+    color: var(--erebus-ide-text-secondary);
+    background: var(--erebus-ide-rail);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #main-toolbar .toolbar-wrapper {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 2px 0;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #main-toolbar .item {
+    border-radius: 6px;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-left-content-panel,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-right-content-panel {
+    background: var(--erebus-ide-void);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-left-content-panel {
+    border-right: 1px solid var(--erebus-ide-border);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-right-content-panel {
+    border-left: 1px solid var(--erebus-ide-border);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-sides {
+    padding: 5px 4px;
+    background: var(--erebus-ide-void);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-sides .lm-TabBar-tab {
+    width: 38px;
+    height: 38px;
+    margin: 2px 0;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    color: var(--erebus-ide-muted);
+    background: transparent;
+    transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-sides .lm-TabBar-tab:hover {
+    border-color: var(--erebus-ide-border);
+    color: var(--erebus-ide-text);
+    background: var(--erebus-ide-surface-raised);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-sides .lm-TabBar-tab.lm-mod-current {
+    border-color: rgba(149, 101, 255, 0.35);
+    color: #d9c8ff;
+    background: var(--erebus-ide-accent-soft);
+    box-shadow: inset 2px 0 var(--erebus-ide-accent);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-left-side-panel,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-right-side-panel {
+    color: var(--erebus-ide-text-secondary);
+    background: var(--erebus-ide-rail);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-left-side-panel {
+    border-right: 1px solid var(--erebus-ide-border);
+    box-shadow: 10px 0 28px rgba(0, 0, 0, 0.14);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-right-side-panel {
+    border-left: 1px solid var(--erebus-ide-border);
+    box-shadow: -10px 0 28px rgba(0, 0, 0, 0.14);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-main-content-panel:not(.memory-dock-panel) {
+    border-top: 1px solid rgba(255, 255, 255, 0.015);
+    color: var(--erebus-ide-text-secondary);
+    background: var(--erebus-ide-surface);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-bottom-content-panel {
+    border-top: 1px solid var(--erebus-ide-border);
+    color: var(--erebus-ide-text-secondary);
+    background: #100e13;
+    box-shadow: 0 -14px 32px rgba(0, 0, 0, 0.16);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .lm-DockPanel-tabBar,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-main,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-bottom {
+    border-bottom: 1px solid var(--erebus-ide-border);
+    background: #111015;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .lm-DockPanel-tabBar .lm-TabBar-content,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-main .lm-TabBar-content,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-bottom .lm-TabBar-content {
+    align-items: center;
+    gap: 2px;
+    padding: 0 4px;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-main-content-panel > .theia-app-main,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-main-content-panel > .lm-DockPanel-widget {
+    box-sizing: border-box;
+    border-right: 6px solid var(--erebus-ide-void);
+    border-left: 6px solid var(--erebus-ide-void);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-main .theia-tabBar-tab-row,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-main .lm-TabBar-content-container,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-main .lm-TabBar-content {
+    height: 35px !important;
+    min-height: 35px !important;
+    box-sizing: border-box;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-main .lm-TabBar-content {
+    padding: 0 8px;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .lm-DockPanel-tabBar .lm-TabBar-tab,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-main .lm-TabBar-tab,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-bottom .lm-TabBar-tab {
+    height: 27px;
+    min-height: 27px;
+    margin: 4px 0;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    color: var(--erebus-ide-muted);
+    background: transparent;
+    cursor: grab;
+    transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .lm-DockPanel-tabBar .lm-TabBar-tab:hover,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-main .lm-TabBar-tab:hover,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-bottom .lm-TabBar-tab:hover {
+    color: var(--erebus-ide-text-secondary);
+    background: rgba(255, 255, 255, 0.035);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .lm-DockPanel-tabBar .lm-TabBar-tab.lm-mod-current,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-main .lm-TabBar-tab.lm-mod-current,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-bottom .lm-TabBar-tab.lm-mod-current {
+    border-color: var(--erebus-ide-border);
+    color: var(--erebus-ide-text);
+    background: var(--erebus-ide-surface-raised);
+    box-shadow: inset 0 1px rgba(149, 101, 255, 0.75);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .lm-DockPanel-tabBar .lm-TabBar-tab:active,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-main .lm-TabBar-tab:active,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-app-bottom .lm-TabBar-tab:active {
+    cursor: grabbing;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .lm-TabBar-tab.lm-mod-drag-image,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .lm-mod-drag-image {
+    border: 1px solid rgba(149, 101, 255, 0.55) !important;
+    border-radius: 8px !important;
+    color: var(--erebus-ide-text) !important;
+    background: var(--erebus-ide-surface-raised) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.48), 0 0 0 3px rgba(149, 101, 255, 0.1) !important;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .lm-DockPanel-overlay:not(.lm-mod-hidden) {
+    border: 1px solid rgba(177, 140, 255, 0.8) !important;
+    border-radius: 10px;
+    background: rgba(149, 101, 255, 0.18) !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 28px rgba(125, 73, 239, 0.2);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .lm-SplitPanel-handle:not(.sash-hidden)::after {
+    background: transparent;
+    transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .lm-SplitPanel-handle:not(.sash-hidden):hover::after,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .lm-SplitPanel-handle:not(.sash-hidden):active::after {
+    background: var(--erebus-ide-accent);
+    box-shadow: 0 0 10px rgba(149, 101, 255, 0.5);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-TreeNode {
+    margin: 1px 5px;
+    border-radius: 6px;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-TreeNode:hover {
+    background: var(--theia-list-hoverBackground);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) input,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) textarea,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-select-component {
+    border-radius: 7px;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-button.main,
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) .theia-button.primary {
+    border-color: transparent;
+    border-radius: 7px;
+    color: #fff;
+    background: var(--erebus-ide-accent-strong);
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-statusBar {
+    border-top: 1px solid var(--erebus-ide-border);
+    color: var(--erebus-ide-muted);
+    background: var(--erebus-ide-void);
+    font-size: 10px;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-statusBar .element {
+    margin: 2px 1px;
+    border-radius: 5px;
+}
+
+body.erebus-ide-shell:not(.erebus-agent-focus-mode) #theia-statusBar .element:hover {
+    color: var(--erebus-ide-text);
+    background: var(--erebus-ide-surface-hover);
+}
+
+.erebus-welcome {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    color: var(--erebus-ide-text-secondary);
+    background:
+        radial-gradient(circle at 78% 4%, rgba(149, 101, 255, 0.09), transparent 31%),
+        linear-gradient(145deg, #151219 0%, #121016 54%, #0f0d12 100%);
+}
+
+.erebus-welcome-main {
+    width: min(1120px, calc(100% - 64px));
+    margin: auto;
+    padding: clamp(44px, 7vh, 86px) 0 28px;
+}
+
+.erebus-welcome-hero {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    max-width: 760px;
+    margin-bottom: 36px;
+}
+
+.erebus-welcome-mark {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 48px;
+    height: 48px;
+    margin-top: 2px;
+    border: 1px solid rgba(149, 101, 255, 0.45);
+    border-radius: 14px;
+    background: linear-gradient(145deg, rgba(149, 101, 255, 0.24), rgba(149, 101, 255, 0.06));
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+}
+
+.erebus-welcome-mark > span {
+    width: 5px;
+    height: 15px;
+    border-radius: 3px;
+    background: #f7f2ff;
+}
+
+.erebus-welcome-eyebrow,
+.erebus-welcome-card-label {
+    color: #a88aff;
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.erebus-welcome-hero h1 {
+    margin: 8px 0 9px;
+    color: var(--erebus-ide-text);
+    font-size: clamp(30px, 4vw, 48px);
+    font-weight: 660;
+    letter-spacing: -0.035em;
+    line-height: 1.08;
+}
+
+.erebus-welcome-hero p {
+    max-width: 650px;
+    margin: 0;
+    color: var(--erebus-ide-text-secondary);
+    font-size: 14px;
+    line-height: 1.65;
+}
+
+.erebus-welcome-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+    gap: 14px;
+}
+
+.erebus-welcome-card {
+    min-width: 0;
+    padding: 22px;
+    border: 1px solid var(--erebus-ide-border);
+    border-radius: 14px;
+    background: rgba(27, 23, 32, 0.9);
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.14);
+    transition: border-color 150ms ease, transform 150ms ease, background 150ms ease;
+}
+
+.erebus-welcome-card:hover {
+    border-color: var(--erebus-ide-border-strong);
+    background: rgba(31, 27, 36, 0.96);
+}
+
+.erebus-welcome-card h2 {
+    margin: 7px 0 6px;
+    color: var(--erebus-ide-text);
+    font-size: 17px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+}
+
+.erebus-welcome-card > p {
+    margin: 0 0 17px;
+    color: var(--erebus-ide-muted);
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.erebus-welcome-card.is-agent {
+    background:
+        linear-gradient(145deg, rgba(149, 101, 255, 0.1), transparent 58%),
+        rgba(27, 23, 32, 0.92);
+}
+
+.erebus-welcome-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.erebus-welcome-actions button {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 48px;
+    padding: 7px 10px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    color: var(--erebus-ide-text-secondary);
+    background: rgba(255, 255, 255, 0.025);
+    text-align: left;
+    cursor: pointer;
+    transition: color 120ms ease, border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.erebus-welcome-actions button:hover {
+    border-color: var(--erebus-ide-border-strong);
+    color: var(--erebus-ide-text);
+    background: rgba(255, 255, 255, 0.055);
+    transform: translateY(-1px);
+}
+
+.erebus-welcome-actions button.is-primary {
+    border-color: rgba(149, 101, 255, 0.3);
+    color: #fff;
+    background: linear-gradient(135deg, #7946e8, #925cff);
+}
+
+.erebus-welcome-actions button.is-primary:hover {
+    background: linear-gradient(135deg, #854ff1, #a16dff);
+}
+
+.erebus-welcome-actions button.is-primary small {
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.erebus-welcome-actions button.is-agent {
+    border-color: rgba(149, 101, 255, 0.25);
+    background: rgba(149, 101, 255, 0.12);
+}
+
+.erebus-welcome-actions button > .codicon:first-child {
+    color: inherit;
+    font-size: 16px;
+    text-align: center;
+}
+
+.erebus-welcome-actions button > span:not(.erebus-welcome-shortcut) {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.erebus-welcome-actions button strong {
+    color: inherit;
+    font-size: 12px;
+    font-weight: 620;
+}
+
+.erebus-welcome-actions button small {
+    margin-top: 1px;
+    color: var(--erebus-ide-muted);
+    font-size: 10px;
+}
+
+.erebus-welcome-shortcut {
+    padding: 2px 5px;
+    border: 1px solid var(--erebus-ide-border);
+    border-radius: 4px;
+    color: var(--erebus-ide-muted);
+    background: rgba(0, 0, 0, 0.18);
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+.erebus-welcome-card.is-recent .gs-section {
+    margin: 0;
+}
+
+.erebus-welcome-card.is-recent .gs-section-header {
+    margin: 0 0 12px;
+    color: var(--erebus-ide-text);
+    font-size: 17px;
+    font-weight: 650;
+}
+
+.erebus-welcome-card.is-recent ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.erebus-welcome-card.is-recent li,
+.erebus-welcome-card.is-recent .gs-action-container {
+    margin: 4px 0;
+    padding: 8px;
+    border-radius: 7px;
+    color: var(--erebus-ide-text-secondary);
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.erebus-layout-diagram {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 78px;
+    grid-template-rows: 72px 26px;
+    gap: 5px;
+    height: 103px;
+    margin-top: 19px;
+    padding: 8px;
+    border: 1px solid var(--erebus-ide-border);
+    border-radius: 9px;
+    background: #0f0d12;
+}
+
+.erebus-layout-diagram > span {
+    border: 1px solid #37303f;
+    border-radius: 5px;
+    background: #1d1922;
+}
+
+.erebus-layout-diagram .is-rail {
+    grid-row: 1 / 3;
+    background: #151219;
+}
+
+.erebus-layout-diagram .is-editor {
+    box-shadow: inset 0 2px rgba(149, 101, 255, 0.7);
+}
+
+.erebus-layout-diagram .is-agent {
+    background: rgba(149, 101, 255, 0.12);
+}
+
+.erebus-layout-diagram .is-panel {
+    grid-column: 2 / 4;
+}
+
+.erebus-welcome-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 19px 3px 0;
+    color: var(--erebus-ide-muted);
+    font-size: 10px;
+}
+
+.erebus-welcome-footer > span:last-child {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.erebus-welcome-preferences {
+    padding: 10px 24px;
+    border-top: 1px solid var(--erebus-ide-border);
+    color: var(--erebus-ide-muted);
+    background: rgba(11, 9, 13, 0.72);
+    font-size: 10px;
+}
+
+.erebus-welcome-preferences .gs-preference-container {
+    padding: 0;
+}
+
+@media (max-width: 920px) {
+    .erebus-welcome-main {
+        width: min(680px, calc(100% - 40px));
+    }
+
+    .erebus-welcome-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 620px) {
+    .erebus-welcome-main {
+        width: calc(100% - 28px);
+        padding-top: 30px;
+    }
+
+    .erebus-welcome-hero {
+        gap: 13px;
+    }
+
+    .erebus-welcome-mark {
+        width: 40px;
+        height: 40px;
+        border-radius: 11px;
+    }
+
+    .erebus-welcome-hero h1 {
+        font-size: 29px;
+    }
+
+    .erebus-welcome-footer {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 7px;
+    }
 }

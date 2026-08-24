@@ -9,7 +9,6 @@
 
 import { WindowService } from '@theia/core/lib/browser/window/window-service';
 import * as React from 'react';
-import { getBrandingVariant } from './theia-ide-config';
 
 export interface ExternalBrowserLinkProps {
     text: string;
@@ -18,9 +17,7 @@ export interface ExternalBrowserLinkProps {
 }
 
 export function renderProductName(): React.ReactNode {
-    const variant = getBrandingVariant();
-    const suffix = variant !== 'stable' ? ` ${variant.charAt(0).toUpperCase() + variant.slice(1)}` : '';
-    return <h1>Eclipse Theia <span className="gs-blue-header">IDE</span>{suffix}</h1>;
+    return <h1>Erebus <span className="gs-purple-header">Agent Studio</span></h1>;
 }
 
 function BrowserLink(props: ExternalBrowserLinkProps): React.JSX.Element {
@@ -40,7 +37,7 @@ export function renderWhatIs(windowService: WindowService): React.ReactNode {
             What is this?
         </h3>
         <div>
-            The Eclipse Theia IDE is a modern and open IDE for cloud and desktop. The Theia IDE is based on the <BrowserLink text="Theia platform"
+            Erebus is an agent-first desktop editor centered on focused, observable work sessions. It is built on the <BrowserLink text="Eclipse Theia platform"
                 url="https://theia-ide.org" windowService={windowService} ></BrowserLink>.
         </div>
         <div>

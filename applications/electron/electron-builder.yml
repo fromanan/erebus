@@ -1,6 +1,6 @@
-appId: eclipse.theia
-productName: TheiaIDE
-copyright: Copyright © 2020-2026 Eclipse Foundation, Inc
+appId: com.fromanium.erebus
+productName: Erebus
+copyright: Copyright © 2026 Erebus contributors
 electronDist: ../../node_modules/electron/dist
 electronVersion: 42.8.1
 asar: true
@@ -20,7 +20,7 @@ files:
   - src-gen
   - lib
   - resources/icons/WindowIcon/512-512.png
-  - resources/TheiaIDESplash.svg
+  - resources/ErebusSplash.svg
   - scripts
   - "!**node_modules/**"
 extraResources:
@@ -39,9 +39,9 @@ mac:
   icon: resources/icons/MacLauncherIcons/icon.icns
   category: public.app-category.developer-tools
   protocols:
-    - name: theia
+    - name: erebus
       schemes:
-        - theia
+        - erebus
   darkModeSupport: true
   target:
     - dmg

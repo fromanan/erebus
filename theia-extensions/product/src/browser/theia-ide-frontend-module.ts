@@ -10,7 +10,7 @@
 import '../../src/browser/style/index.css';
 
 import { AIRegistryConfiguration } from '@theia/ai-registry/lib/common/ai-registry-configuration';
-import { WidgetFactory } from '@theia/core/lib/browser';
+import { FrontendApplicationContribution, WidgetFactory } from '@theia/core/lib/browser';
 import { AboutDialog } from '@theia/core/lib/browser/about-dialog';
 import { applyBranding } from './theia-ide-config';
 import { CommandContribution } from '@theia/core/lib/common/command';
@@ -37,7 +37,7 @@ export default new ContainerModule((bind, _unbind, isBound, rebind) => {
     }
 
     bind(TheiaIDEContribution).toSelf().inSingletonScope();
-    [CommandContribution, MenuContribution].forEach(serviceIdentifier =>
+    [FrontendApplicationContribution, CommandContribution, MenuContribution].forEach(serviceIdentifier =>
         bind(serviceIdentifier).toService(TheiaIDEContribution)
     );
 

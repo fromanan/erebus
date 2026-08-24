@@ -8,6 +8,7 @@
  ********************************************************************************/
 
 import { inject, injectable } from '@theia/core/shared/inversify';
+import { FrontendApplicationContribution } from '@theia/core/lib/browser';
 import { CommonMenus } from '@theia/core/lib/browser/common-frontend-contribution';
 import { Command, CommandContribution, CommandRegistry } from '@theia/core/lib/common/command';
 import { MenuContribution, MenuModelRegistry, MenuPath } from '@theia/core/lib/common/menu';
@@ -31,13 +32,21 @@ export namespace TheiaIDECommands {
 }
 
 @injectable()
-export class TheiaIDEContribution implements CommandContribution, MenuContribution {
+export class TheiaIDEContribution implements FrontendApplicationContribution, CommandContribution, MenuContribution {
 
     @inject(WindowService)
     protected readonly windowService: WindowService;
 
     static REPORT_ISSUE_URL = 'https://github.com/eclipse-theia/theia-ide/issues/new?assignees=&labels=&template=bug_report.md';
     static DOCUMENTATION_URL = 'https://theia-ide.org/docs/user_getting_started/';
+
+    onStart(): void {
+        document.body.classList.add('erebus-ide-shell');
+    }
+
+    onStop(): void {
+        document.body.classList.remove('erebus-ide-shell');
+    }
 
     registerCommands(commandRegistry: CommandRegistry): void {
         commandRegistry.registerCommand(TheiaIDECommands.REPORT_ISSUE, {

@@ -1,0 +1,34 @@
+diff --git a/node_modules/@theia/bundle-plugin/lib/esbuild-plugin.js b/node_modules/@theia/bundle-plugin/lib/esbuild-plugin.js
+index 000456f..447fe01 100644
+--- a/node_modules/@theia/bundle-plugin/lib/esbuild-plugin.js
++++ b/node_modules/@theia/bundle-plugin/lib/esbuild-plugin.js
+@@ -209,9 +209,11 @@ class PluginImpl {
+         }
+         build.onResolve({ filter: /^@vscode\/windows-ca-certs$/ }, () => {
+             const windows = process.platform === 'win32';
++            const modulePath = windows ? resolveModulePath('@vscode/windows-ca-certs') : '';
++            const nativePath = windows ? join(modulePath, 'build', 'Release', 'crypt32.node') : '';
+             return {
+                 path: windows
+-                    ? join(resolveModulePath('@vscode/windows-ca-certs'), 'build', 'Release', 'crypt32.node')
++                    ? fs.existsSync(nativePath) ? nativePath : join(modulePath, 'index.js')
+                     : '',
+                 // Simply mark the dependency as external on non-Windows platforms
+                 external: !windows
+diff --git a/node_modules/@theia/bundle-plugin/src/esbuild-plugin.ts b/node_modules/@theia/bundle-plugin/src/esbuild-plugin.ts
+index 663ce72..cf49286 100644
+--- a/node_modules/@theia/bundle-plugin/src/esbuild-plugin.ts
++++ b/node_modules/@theia/bundle-plugin/src/esbuild-plugin.ts
+@@ -227,9 +227,11 @@ class PluginImpl implements Plugin {
+         }
+         build.onResolve({ filter: /^@vscode\/windows-ca-certs$/ }, () => {
+             const windows = process.platform === 'win32';
++            const modulePath = windows ? resolveModulePath('@vscode/windows-ca-certs') : '';
++            const nativePath = windows ? join(modulePath, 'build', 'Release', 'crypt32.node') : '';
+             return {
+                 path: windows
+-                    ? join(resolveModulePath('@vscode/windows-ca-certs'), 'build', 'Release', 'crypt32.node')
++                    ? fs.existsSync(nativePath) ? nativePath : join(modulePath, 'index.js')
+                     : '',
+                 // Simply mark the dependency as external on non-Windows platforms
+                 external: !windows

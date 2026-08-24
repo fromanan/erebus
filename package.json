@@ -1,6 +1,8 @@
 {
+  "name": "erebus",
   "private": true,
-  "version": "1.74.100",
+  "version": "0.1.0",
+  "description": "An agent-first desktop IDE experience built on Eclipse Theia and Electron.",
   "license": "MIT",
   "author": "Rob Moran <github@thegecko.org>",
   "homepage": "https://github.com/eclipse-theia/theia-ide#readme",
@@ -29,7 +31,7 @@
     "eslint-plugin-no-unsanitized": "^3.2.0",
     "eslint-plugin-react": "^7.37.5",
     "lerna": "^9.0.7",
-    "node-gyp": "^11.5.0",
+    "node-gyp": "^13.0.1",
     "rimraf": "^2.7.1",
     "ts-node": "^10.9.2",
     "type-fest": "^0.20.2",
@@ -79,9 +81,11 @@
   ],
   "workspaces": [
     "applications/*",
+    "compatibility/*",
     "theia-extensions/*"
   ],
   "resolutions": {
+    "node-gyp": "^13.0.1",
     "@types/puppeteer": "^5.4.7",
     "**/yauzl": "^3.3.1",
     "**/adm-zip": "^0.6.0",
