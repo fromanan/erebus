@@ -15,10 +15,48 @@ export type SessionProvider = 'erebus' | 'claude' | 'codex' | 'kiro';
 
 export type MessageRole = 'user' | 'agent';
 
+export type FocusContextKind = 'file' | 'folder' | 'workspace' | 'session';
+
+export interface FocusContextItem {
+    id: string;
+    kind: FocusContextKind;
+    label: string;
+    detail?: string;
+    paths?: string[];
+}
+
+export interface FocusExecutionParameters {
+    permissions: {
+        mode: string;
+        label: string;
+    };
+    attachments: Array<{
+        kind: FocusContextKind;
+        label: string;
+        detail?: string;
+        paths?: string[];
+    }>;
+    model: {
+        id: string;
+        label: string;
+    };
+    reasoningLevel: {
+        id: string;
+        label: string;
+    };
+    autopilot: boolean;
+    workspace: string;
+    session: string;
+}
+
 export interface FocusMessage {
     id: string;
     role: MessageRole;
     body: string[];
+    context?: FocusContextItem[];
+    executionParameters?: FocusExecutionParameters;
+    agentName?: string;
+    executionProfile?: string;
     toolCalls?: number;
     changedFiles?: string[];
     elapsed?: string;
@@ -51,6 +89,8 @@ export interface FocusSession {
     readOnly?: boolean;
     loading?: boolean;
     truncatedMessages?: number;
+    tags?: string[];
+    hidden?: boolean;
 }
 
 export type WorkflowKind = 'Spec' | 'Plan' | 'Bug Fix' | 'Quick Spec';

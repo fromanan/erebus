@@ -10,5 +10,5 @@
   <ellipse cx="223" cy="116" rx="170" ry="112" fill="url(#halo)"/>
   <image x="175" y="54" width="96" height="96" href="icons/Erebus.png" preserveAspectRatio="xMidYMid meet"/>
   <text x="223" y="190" fill="#F4F0F7" font-family="Segoe UI, sans-serif" font-size="27" font-weight="650" text-anchor="middle" letter-spacing="1">EREBUS</text>
-  <text x="223" y="216" fill="#938B9C" font-family="Segoe UI, sans-serif" font-size="11" font-weight="500" text-anchor="middle" letter-spacing="2.2">AGENT-FIRST IDE</text>
+  <text x="223" y="216" fill="#938B9C" font-family="Segoe UI, sans-serif" font-size="11" font-weight="500" text-anchor="middle" letter-spacing="2.2">AGENTIC WORKFLOW EVOLVED</text>
 </svg>
