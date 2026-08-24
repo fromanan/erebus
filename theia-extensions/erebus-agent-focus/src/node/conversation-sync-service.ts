@@ -9,8 +9,8 @@
 
 import { createReadStream } from 'fs';
 import { promises as fs } from 'fs';
-import { homedir } from 'os';
-import { basename, dirname, join, resolve } from 'path';
+import { homedir, tmpdir } from 'os';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'path';
 import { createInterface } from 'readline';
 import { injectable } from '@theia/core/shared/inversify';
 import {
@@ -44,6 +44,17 @@ interface CodexIndexEntry {
     updated_at?: string;
 }
 
+interface ClaudeConversationCandidate {
+    file: string;
+    summary: SyncedConversationSummary;
+}
+
+interface ClaudeConversationMetadata {
+    cwd?: string;
+    firstUserMessage?: string;
+    sessionId?: string;
+}
+
 interface SqliteStatement {
     all(...parameters: unknown[]): unknown[];
 }
@@ -64,26 +75,28 @@ interface NodeSqliteModule {
 
 @injectable()
 export class ConversationSyncServiceImpl implements ConversationSyncService {
+    protected readonly claudeRoot = resolve(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'));
     protected readonly codexRoot = resolve(process.env.CODEX_HOME || join(homedir(), '.codex'));
     protected readonly kiroRoot = resolve(process.env.KIRO_HOME || join(homedir(), '.kiro'));
     protected readonly locators = new Map<string, ConversationLocator>();
     protected cachedSnapshot: ConversationSyncSnapshot | undefined;
     protected cachedSnapshotAt = 0;
 
-    async listConversations(): Promise<ConversationSyncSnapshot> {
-        if (this.cachedSnapshot && Date.now() - this.cachedSnapshotAt < SNAPSHOT_CACHE_MS) {
+    async listConversations(force = false): Promise<ConversationSyncSnapshot> {
+        if (!force && this.cachedSnapshot && Date.now() - this.cachedSnapshotAt < SNAPSHOT_CACHE_MS) {
             return this.cachedSnapshot;
         }
         this.locators.clear();
-        const [codex, kiro] = await Promise.all([
+        const [claude, codex, kiro] = await Promise.all([
+            this.listClaudeConversations(),
             this.listCodexConversations(),
             this.listKiroConversations()
         ]);
-        const conversations = [...codex.conversations, ...kiro.conversations]
+        const conversations = [...claude.conversations, ...codex.conversations, ...kiro.conversations]
             .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
         this.cachedSnapshot = {
             conversations,
-            sources: [codex.status, kiro.status]
+            sources: [claude.status, codex.status, kiro.status]
         };
         this.cachedSnapshotAt = Date.now();
         return this.cachedSnapshot;
@@ -104,9 +117,67 @@ export class ConversationSyncServiceImpl implements ConversationSyncService {
         if (locator.kind === 'sqlite') {
             return this.readKiroSqliteConversation(locator);
         }
-        return provider === 'codex'
-            ? this.readCodexConversation(locator)
-            : this.readKiroJsonlConversation(locator);
+        if (provider === 'claude') {
+            return this.readClaudeConversation(locator);
+        }
+        return provider === 'codex' ? this.readCodexConversation(locator) : this.readKiroJsonlConversation(locator);
+    }
+
+    protected async listClaudeConversations(): Promise<{ conversations: SyncedConversationSummary[]; status: ConversationSourceStatus }> {
+        const projectsRoot = join(this.claudeRoot, 'projects');
+        if (!await this.pathExists(projectsRoot)) {
+            return this.unavailableResult('claude', 'No ~/.claude conversation store found.');
+        }
+        try {
+            const files = await this.findFiles([projectsRoot], file => {
+                const relativePath = relative(projectsRoot, file);
+                return file.endsWith('.jsonl')
+                    && UUID_PATTERN.test(basename(file))
+                    && !relativePath.split(/[\\/]/).includes('subagents');
+            });
+            const candidates = (await this.mapConcurrent(files, SUMMARY_READ_CONCURRENCY, async file => {
+                const [metadata, stat] = await Promise.all([this.readClaudeMetadata(file), fs.stat(file)]);
+                const id = metadata.sessionId || basename(file, '.jsonl');
+                if (!this.isSafeConversationId(id)) {
+                    return undefined;
+                }
+                const workspace = await this.resolveClaudeWorkspace(metadata.cwd);
+                const summary: SyncedConversationSummary = {
+                    id,
+                    provider: 'claude',
+                    title: this.titleFromText(metadata.firstUserMessage,
+                        workspace === 'Uncategorized' ? 'Claude conversation' : `${workspace} conversation`),
+                    workspace,
+                    cwd: metadata.cwd,
+                    updatedAt: stat.mtime.toISOString(),
+                    active: Date.now() - stat.mtimeMs < ACTIVE_FILE_WINDOW_MS
+                };
+                return { file, summary };
+            })).filter((candidate): candidate is ClaudeConversationCandidate => Boolean(candidate));
+
+            const latestById = new Map<string, ClaudeConversationCandidate>();
+            candidates.forEach(candidate => {
+                const existing = latestById.get(candidate.summary.id);
+                if (!existing || Date.parse(candidate.summary.updatedAt) > Date.parse(existing.summary.updatedAt)) {
+                    latestById.set(candidate.summary.id, candidate);
+                }
+            });
+            const conversations = [...latestById.values()].map(candidate => {
+                this.locators.set(this.locatorKey('claude', candidate.summary.id), {
+                    provider: 'claude',
+                    kind: 'jsonl',
+                    path: candidate.file,
+                    summary: candidate.summary
+                });
+                return candidate.summary;
+            });
+            return {
+                conversations,
+                status: { provider: 'claude', available: true, conversationCount: conversations.length }
+            };
+        } catch (error) {
+            return this.unavailableResult('claude', this.errorMessage(error));
+        }
     }
 
     protected async listCodexConversations(): Promise<{ conversations: SyncedConversationSummary[]; status: ConversationSourceStatus }> {
@@ -149,12 +220,18 @@ export class ConversationSyncServiceImpl implements ConversationSyncService {
                 }
                 const [metadata, stat] = await Promise.all([this.readCodexMetadata(file), fs.stat(file)]);
                 const cwd = this.firstString(metadata, ['cwd']);
-                const updatedAt = this.toIsoDate(entry.updated_at, stat.mtime);
+                const workspace = await this.resolveCodexWorkspace(cwd);
+                const indexedTimestamp = entry.updated_at ? Date.parse(entry.updated_at) : 0;
+                const updatedAt = new Date(Math.max(
+                    Number.isNaN(indexedTimestamp) ? 0 : indexedTimestamp,
+                    stat.mtimeMs
+                )).toISOString();
                 const summary: SyncedConversationSummary = {
                     id: entry.id,
                     provider: 'codex',
-                    title: this.cleanTitle(entry.thread_name) || this.titleFromWorkspace(cwd, 'Codex conversation'),
-                    workspace: this.workspaceName(cwd, 'Codex'),
+                    title: this.cleanTitle(entry.thread_name)
+                        || (workspace === 'Uncategorized' ? 'Codex conversation' : `${workspace} conversation`),
+                    workspace,
                     cwd,
                     updatedAt,
                     active: Date.now() - stat.mtimeMs < ACTIVE_FILE_WINDOW_MS
@@ -364,6 +441,22 @@ export class ConversationSyncServiceImpl implements ConversationSyncService {
         return { ...locator.summary, messages, truncatedMessages };
     }
 
+    protected async readClaudeConversation(locator: ConversationLocator): Promise<SyncedConversationDetail> {
+        const messages: SyncedConversationMessage[] = [];
+        let truncatedMessages = 0;
+        let lineNumber = 0;
+        const input = createReadStream(locator.path, { encoding: 'utf8' });
+        const lines = createInterface({ input, crlfDelay: Infinity });
+        for await (const line of lines) {
+            lineNumber++;
+            const message = this.normalizeClaudeMessage(this.parseJsonValue(line), lineNumber);
+            if (message) {
+                truncatedMessages += this.pushBounded(messages, message);
+            }
+        }
+        return { ...locator.summary, messages, truncatedMessages };
+    }
+
     protected async readKiroJsonlConversation(locator: ConversationLocator): Promise<SyncedConversationDetail> {
         const messages: SyncedConversationMessage[] = [];
         let truncatedMessages = 0;
@@ -389,7 +482,7 @@ export class ConversationSyncServiceImpl implements ConversationSyncService {
         try {
             database.exec('PRAGMA query_only = ON');
             const columns = database.prepare(`PRAGMA table_info("${locator.table}")`).all()
-                .map(row => this.asRecord(row)?.name)
+                .map(columnRow => this.asRecord(columnRow)?.name)
                 .filter((name): name is string => typeof name === 'string');
             const idColumn = ['conversation_id', 'session_id', 'id'].find(column => columns.includes(column));
             if (!idColumn) {
@@ -436,6 +529,82 @@ export class ConversationSyncServiceImpl implements ConversationSyncService {
             body,
             toolCalls: this.numberValue(nested.toolCalls ?? nested.tool_calls) || undefined
         };
+    }
+
+    protected normalizeClaudeMessage(candidate: unknown, index: number): SyncedConversationMessage | undefined {
+        const record = this.asRecord(candidate);
+        if (!record) {
+            return undefined;
+        }
+        const nested = this.asRecord(record.message) || record;
+        const role = (this.stringValue(nested.role) || this.stringValue(record.type))?.toLowerCase();
+        if (role !== 'user' && role !== 'assistant') {
+            return undefined;
+        }
+        const content = nested.content ?? record.content;
+        const body = this.extractClaudeTextParts(content);
+        if (body.length === 0) {
+            return undefined;
+        }
+        const toolCalls = role === 'assistant' && Array.isArray(content)
+            ? content.filter(block => this.stringValue(this.asRecord(block)?.type) === 'tool_use').length
+            : 0;
+        return {
+            id: this.stringValue(record.uuid) || this.stringValue(nested.id) || `claude-message-${index}`,
+            role: role === 'assistant' ? 'agent' : 'user',
+            body,
+            toolCalls: toolCalls || undefined
+        };
+    }
+
+    protected extractClaudeTextParts(value: unknown): string[] {
+        if (typeof value === 'string') {
+            const text = value.trim();
+            return text ? [text] : [];
+        }
+        if (Array.isArray(value)) {
+            return value.flatMap(item => this.extractClaudeTextParts(item));
+        }
+        const record = this.asRecord(value);
+        if (!record) {
+            return [];
+        }
+        const blockType = this.stringValue(record.type);
+        if (blockType && !['text', 'input_text', 'output_text'].includes(blockType)) {
+            return [];
+        }
+        return this.extractTextParts(record.text ?? record.content);
+    }
+
+    protected async readClaudeMetadata(file: string): Promise<ClaudeConversationMetadata> {
+        const metadata: ClaudeConversationMetadata = {};
+        let lineNumber = 0;
+        const input = createReadStream(file, { encoding: 'utf8' });
+        const lines = createInterface({ input, crlfDelay: Infinity });
+        try {
+            for await (const line of lines) {
+                lineNumber++;
+                const record = this.parseJsonValue(line);
+                if (!record) {
+                    continue;
+                }
+                metadata.sessionId ||= this.firstString(record, ['sessionId', 'session_id']);
+                metadata.cwd ||= this.firstString(record, ['cwd', 'projectPath', 'project_path']);
+                if (!metadata.firstUserMessage) {
+                    const message = this.normalizeClaudeMessage(record, lineNumber);
+                    if (message?.role === 'user') {
+                        metadata.firstUserMessage = message.body[0];
+                    }
+                }
+                if ((metadata.sessionId && metadata.cwd && metadata.firstUserMessage) || lineNumber >= 200) {
+                    break;
+                }
+            }
+        } finally {
+            lines.close();
+            input.destroy();
+        }
+        return metadata;
     }
 
     protected async readCodexMetadata(file: string): Promise<Record<string, unknown>> {
@@ -677,6 +846,84 @@ export class ConversationSyncServiceImpl implements ConversationSyncService {
     protected titleFromWorkspace(cwd: string | undefined, fallback: string): string {
         const workspace = this.workspaceName(cwd, '');
         return workspace ? `${workspace} conversation` : fallback;
+    }
+
+    protected async resolveCodexWorkspace(value: unknown): Promise<string> {
+        return this.resolveExternalWorkspace(value, [
+            this.codexRoot,
+            resolve(join(homedir(), 'Documents', 'Codex'))
+        ]);
+    }
+
+    protected async resolveClaudeWorkspace(value: unknown): Promise<string> {
+        return this.resolveExternalWorkspace(value, [this.claudeRoot]);
+    }
+
+    protected async resolveExternalWorkspace(value: unknown, providerRoots: string[]): Promise<string> {
+        const rawPath = this.stringValue(value)?.replace(/^\\\\\?\\/, '').replace(/[\\/]+$/, '');
+        if (!rawPath) {
+            return 'Uncategorized';
+        }
+        const cwd = resolve(rawPath);
+        const syntheticRoots = [
+            ...providerRoots,
+            resolve(tmpdir()),
+            ...[process.env.TEMP, process.env.TMP]
+                .filter((candidate): candidate is string => Boolean(candidate))
+                .map(candidate => resolve(candidate))
+        ];
+        const genericRoots = [
+            resolve(homedir()),
+            resolve(join(homedir(), 'Desktop')),
+            resolve(join(homedir(), 'Documents')),
+            resolve(join(homedir(), 'Downloads'))
+        ];
+        if (genericRoots.includes(cwd) || syntheticRoots.some(root => this.isPathWithin(cwd, root))) {
+            return 'Uncategorized';
+        }
+        try {
+            if (!(await fs.stat(cwd)).isDirectory()) {
+                return 'Uncategorized';
+            }
+        } catch {
+            return 'Uncategorized';
+        }
+        const workspaceRoot = await this.findWorkspaceRoot(cwd);
+        return this.workspaceName(workspaceRoot || cwd, 'Uncategorized');
+    }
+
+    protected async findWorkspaceRoot(start: string): Promise<string | undefined> {
+        const repositoryRoot = await this.findAncestorWithMarker(start, ['.git', '.plastic', '.hg']);
+        return repositoryRoot || this.findAncestorWithMarker(start, [
+            'AGENTS.md',
+            'package.json',
+            'pyproject.toml',
+            'Cargo.toml',
+            'go.mod',
+            'default.project.json',
+            join('ProjectSettings', 'ProjectVersion.txt')
+        ]);
+    }
+
+    protected async findAncestorWithMarker(start: string, markers: string[]): Promise<string | undefined> {
+        let current = start;
+        while (true) {
+            for (const marker of markers) {
+                if (await this.pathExists(join(current, marker))) {
+                    return current;
+                }
+            }
+            const parent = dirname(current);
+            if (parent === current) {
+                return undefined;
+            }
+            current = parent;
+        }
+    }
+
+    protected isPathWithin(candidate: string, root: string): boolean {
+        const pathFromRoot = relative(root, candidate);
+        return pathFromRoot === '' || (!pathFromRoot.startsWith('..') && !isAbsolute(pathFromRoot));
     }
 
     protected workspaceName(value: unknown, fallback: string): string {

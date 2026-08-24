@@ -2,7 +2,7 @@
 
 Erebus is an agent-first desktop IDE concept built on the actively maintained [Eclipse Theia IDE](https://github.com/eclipse-theia/theia-ide) Electron template. Its primary surface is a chat-first Agent Focus view for directing parallel sessions, handling blocking requests, and reviewing artifacts without making the code editor the center of every task.
 
-This repository currently implements the frontend experience. Session content and responses are local fixtures; Theia's real editor, terminal, source-control, extension, MCP, and AI-provider packages remain available underneath the focused surface.
+The Agent Focus surface includes local Erebus fixtures plus read-only, live conversation discovery for Claude, Codex, and Kiro. Theia's real editor, terminal, source-control, extension, MCP, and AI-provider packages remain available underneath the focused surface.
 
 ## Why this foundation
 
@@ -29,6 +29,7 @@ Implemented interactions include:
 - submitting local prototype messages;
 - returning to the full Theia IDE and reopening Agent Focus with `Ctrl/Cmd+Alt+A`.
 - moving and resizing the frameless Electron window, plus dedicated minimize, maximize/restore, full-screen, and close controls.
+- discovering Claude, Codex, and Kiro conversations from their local stores, grouping them by provider and workspace, and loading message history on demand.
 
 The main source is under [`theia-extensions/erebus-agent-focus`](theia-extensions/erebus-agent-focus). The color tokens live at the top of [`agent-focus.css`](theia-extensions/erebus-agent-focus/src/browser/style/agent-focus.css).
 
@@ -77,11 +78,21 @@ yarn browser start
 
 The Electron app opens directly into Agent Focus. Select **IDE** in the top-right to reveal the underlying workbench. Run **Erebus: Open Agent Focus** from the command palette, or press `Ctrl/Cmd+Alt+A`, to return.
 
+## Local data and conversation sync
+
+Erebus owns `~/.erebus`. Theia preferences, user storage, workspace metadata, chat sessions, plugin state, and backend settings resolve through that directory. Electron/Chromium state is kept under `~/.erebus/electron`, and AppImage built-in plugins are copied under `~/.erebus/builtInPlugins`. An explicit `THEIA_CONFIG_DIR` still overrides the default.
+
+The Agent Focus conversation provider reads external stores without modifying them:
+
+- **Claude:** `~/.claude/projects/<encoded-workspace>/*.jsonl` (or `CLAUDE_CONFIG_DIR`).
+- **Codex:** `~/.codex/session_index.jsonl`, `~/.codex/sessions`, and `~/.codex/archived_sessions` (or `CODEX_HOME`).
+- **Kiro:** `~/.kiro/sessions/**/messages.jsonl` plus current Kiro CLI SQLite stores (or `KIRO_HOME`).
+
+Summaries refresh every 15 seconds and full history is streamed from disk only when a conversation is selected. The UI caps a rendered history at the latest 1,000 messages and reports how many older messages remain in the source. Claude and Codex sessions resolve to their repository or recognizable project root; missing paths, generic user folders, and generated scratch directories are grouped under `Uncategorized`. External conversations are currently read-only in Erebus; a two-way integration should resume Claude through its CLI, Codex through `codex app-server`, and Kiro through its ACP server rather than writing any product's private files.
+
 ## Architecture boundary
 
-`ErebusAgentFocusContribution` owns Theia integration: it creates the widget, maximizes the main workbench area, hides the editor tab while focused, and restores the IDE shell when leaving. `AgentFocusView` owns frontend state and interactions. Fixtures are isolated in `agent-focus-fixtures.ts` so a live session adapter can replace them without rewriting presentation components.
-
-The next integration step is to adapt Theia's chat/session services into the `FocusSession` and `FocusMessage` view models. That work is intentionally not simulated in the current frontend milestone.
+`ErebusAgentFocusContribution` owns Theia integration: it creates the widget, maximizes the main workbench area, hides the editor tab while focused, and restores the IDE shell when leaving. `AgentFocusView` owns frontend state and interactions. Fixtures remain isolated in `agent-focus-fixtures.ts`; `ConversationSyncService` is the backend filesystem boundary that maps Claude, Codex, and Kiro records into the same view models without exposing source paths to the browser.
 
 ## Upstream and license
 

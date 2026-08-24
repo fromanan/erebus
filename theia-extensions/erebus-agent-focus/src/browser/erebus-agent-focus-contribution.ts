@@ -8,13 +8,14 @@
  ********************************************************************************/
 
 import { ApplicationShell, FrontendApplicationContribution, WidgetManager } from '@theia/core/lib/browser';
-import { FrontendApplicationStateService } from '@theia/core/lib/browser/frontend-application-state';
 import { KeybindingContribution, KeybindingRegistry } from '@theia/core/lib/browser/keybinding';
 import { MAXIMIZED_CLASS } from '@theia/core/lib/browser/shell/application-shell';
 import { CommandContribution, CommandRegistry } from '@theia/core/lib/common/command';
 import { inject, injectable } from '@theia/core/shared/inversify';
 import { ErebusAgentFocusCommands } from './erebus-agent-focus-commands';
 import { ErebusAgentFocusWidget } from './erebus-agent-focus-widget';
+
+const GETTING_STARTED_WIDGET_ID = 'getting.started.widget';
 
 @injectable()
 export class ErebusAgentFocusContribution implements FrontendApplicationContribution, CommandContribution, KeybindingContribution {
@@ -24,11 +25,10 @@ export class ErebusAgentFocusContribution implements FrontendApplicationContribu
     @inject(WidgetManager)
     protected readonly widgetManager: WidgetManager;
 
-    @inject(FrontendApplicationStateService)
-    protected readonly stateService: FrontendApplicationStateService;
-
-    onStart(): void {
-        this.stateService.reachedState('ready').then(() => this.openFocusMode()).catch(error => console.error(error));
+    async onDidInitializeLayout(): Promise<void> {
+        // A restored Welcome tab must be removed before Theia reveals the shell.
+        await this.shell.closeWidget(GETTING_STARTED_WIDGET_ID);
+        await this.openFocusMode();
     }
 
     onStop(): void {

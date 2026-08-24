@@ -9,7 +9,15 @@
 
 import * as React from 'react';
 import type { TheiaCoreAPI } from '@theia/core/lib/electron-common/electron-api';
+import {
+    ConversationProvider,
+    ConversationSourceStatus,
+    ConversationSyncService,
+    SyncedConversationDetail,
+    SyncedConversationSummary
+} from '../common/conversation-sync-protocol';
 import { SEED_SESSIONS, WORKFLOWS } from './agent-focus-fixtures';
+import { continueMarkdownOnEnter, MarkdownContent, updateFencedCodeLanguage } from './agent-focus-markdown';
 import { FocusMessage, FocusSession, SessionKind, SessionStatus, WorkflowKind } from './agent-focus-types';
 
 const { useEffect, useMemo, useRef, useState } = React;
@@ -19,6 +27,8 @@ const MIN_RAIL_WIDTH = 220;
 const MAX_RAIL_WIDTH = 520;
 const RAIL_WIDTH_STORAGE_KEY = 'erebus.agentFocus.railWidth';
 const PROJECT_CATEGORIES_STORAGE_KEY = 'erebus.agentFocus.projectCategories';
+const CONVERSATION_SYNC_INTERVAL_MS = 15_000;
+const EXTERNAL_PROVIDER_ORDER: ConversationProvider[] = ['claude', 'codex', 'kiro'];
 
 interface ProjectCategory {
     id: string;
@@ -27,7 +37,165 @@ interface ProjectCategory {
 }
 
 export interface AgentFocusViewProps {
+    conversationSyncService: ConversationSyncService;
     onExitFocusMode: () => void;
+}
+
+const providerLabels: Record<ConversationProvider, string> = {
+    claude: 'Claude',
+    codex: 'Codex',
+    kiro: 'Kiro'
+};
+
+const providerMonograms: Record<ConversationProvider, string> = {
+    claude: 'CL',
+    codex: 'CX',
+    kiro: 'KI'
+};
+
+const providerAccents: Record<ConversationProvider, string> = {
+    claude: '#d6ad68',
+    codex: '#45c59a',
+    kiro: '#9b6cff'
+};
+
+function relativeUpdatedAt(updatedAt: string): string {
+    const elapsed = Math.max(0, Date.now() - Date.parse(updatedAt));
+    if (elapsed < 60_000) {
+        return 'now';
+    }
+    if (elapsed < 3_600_000) {
+        return `${Math.floor(elapsed / 60_000)} min`;
+    }
+    if (elapsed < 86_400_000) {
+        return `${Math.floor(elapsed / 3_600_000)} hr`;
+    }
+    return `${Math.floor(elapsed / 86_400_000)} d`;
+}
+
+function focusSessionFromSummary(summary: SyncedConversationSummary, existing?: FocusSession): FocusSession {
+    const providerLabel = providerLabels[summary.provider];
+    const sameVersion = existing?.sourceUpdatedAt === summary.updatedAt;
+    const session: FocusSession = {
+        ...existing,
+        id: `${summary.provider}:${summary.id}`,
+        provider: summary.provider,
+        externalId: summary.id,
+        workspace: summary.workspace,
+        title: summary.title,
+        summary: existing?.summary
+            ?? `${providerLabel} · ${summary.messageCount === undefined ? 'synced conversation' : `${summary.messageCount} messages`}`,
+        updated: sameVersion && existing ? existing.updated : relativeUpdatedAt(summary.updatedAt),
+        status: summary.active ? 'working' : 'paused',
+        kind: 'cli',
+        monogram: providerMonograms[summary.provider],
+        accent: providerAccents[summary.provider],
+        messages: existing?.messages ?? [],
+        requirement: `Read-only conversation synchronized from ${providerLabel}'s local session store.`,
+        designNotes: existing?.designNotes ?? [
+            `Source remains owned by ${providerLabel}`,
+            'Erebus does not modify external conversation files',
+            'New turns must currently be sent from the source application'
+        ],
+        tasks: existing?.tasks ?? [],
+        changedFiles: existing?.changedFiles ?? [],
+        sourceUpdatedAt: summary.updatedAt,
+        readOnly: true,
+        loading: existing?.loading ?? false,
+        truncatedMessages: existing?.truncatedMessages ?? 0
+    };
+    if (existing
+        && existing.workspace === session.workspace
+        && existing.title === session.title
+        && existing.updated === session.updated
+        && existing.status === session.status
+        && existing.monogram === session.monogram
+        && existing.accent === session.accent
+        && existing.sourceUpdatedAt === session.sourceUpdatedAt) {
+        return existing;
+    }
+    return session;
+}
+
+function reconcileConversationSources(
+    current: ConversationSourceStatus[],
+    incoming: ConversationSourceStatus[]
+): ConversationSourceStatus[] {
+    if (current.length === incoming.length && current.every((source, index) => {
+        const next = incoming[index];
+        return source.provider === next.provider
+            && source.available === next.available
+            && source.conversationCount === next.conversationCount
+            && source.message === next.message;
+    })) {
+        return current;
+    }
+    return incoming;
+}
+
+function reconcileSyncedSessions(current: FocusSession[], summaries: SyncedConversationSummary[]): FocusSession[] {
+    const local = current.filter(session => session.provider === 'erebus');
+    const external = current.filter(session => session.provider !== 'erebus');
+    const remaining = new Map(summaries.map(summary => [`${summary.provider}:${summary.id}`, summary]));
+    const nextExternal: FocusSession[] = [];
+
+    external.forEach(session => {
+        const summary = remaining.get(session.id);
+        if (summary) {
+            nextExternal.push(focusSessionFromSummary(summary, session));
+            remaining.delete(session.id);
+        }
+    });
+    summaries.forEach(summary => {
+        const id = `${summary.provider}:${summary.id}`;
+        if (remaining.has(id)) {
+            nextExternal.push(focusSessionFromSummary(summary));
+            remaining.delete(id);
+        }
+    });
+
+    const next = [...local, ...nextExternal];
+    return next.length === current.length && next.every((session, index) => session === current[index])
+        ? current
+        : next;
+}
+
+function sameSyncedMessage(left: FocusMessage, right: FocusMessage): boolean {
+    return left.id === right.id
+        && left.role === right.role
+        && left.toolCalls === right.toolCalls
+        && left.body.length === right.body.length
+        && left.body.every((part, index) => part === right.body[index]);
+}
+
+function reconcileSyncedMessages(current: FocusMessage[], incoming: FocusMessage[]): FocusMessage[] {
+    if (incoming.length >= current.length && current.every((message, index) => sameSyncedMessage(message, incoming[index]))) {
+        return incoming.length === current.length ? current : [...current, ...incoming.slice(current.length)];
+    }
+    return incoming;
+}
+
+function applyConversationDetail(session: FocusSession, detail: SyncedConversationDetail): FocusSession {
+    const messages = reconcileSyncedMessages(session.messages, detail.messages);
+    const summary = `${providerLabels[detail.provider]} · ${detail.messages.length + detail.truncatedMessages} messages`;
+    const status = detail.active ? 'working' : 'paused';
+    if (messages === session.messages
+        && summary === session.summary
+        && detail.updatedAt === session.sourceUpdatedAt
+        && status === session.status
+        && !session.loading
+        && detail.truncatedMessages === session.truncatedMessages) {
+        return session;
+    }
+    return {
+        ...session,
+        messages,
+        summary,
+        sourceUpdatedAt: detail.updatedAt,
+        status,
+        loading: false,
+        truncatedMessages: detail.truncatedMessages
+    };
 }
 
 const statusLabels: Record<SessionStatus, string> = {
@@ -212,9 +380,10 @@ function SessionRow({ session, active, collapsed, onSelect }: {
     </button>;
 }
 
-function SessionRail({ sessions, categories, selectedId, collapsed, onSelect, onNewSession, onCreateCategory, onAssignProject }: {
+function SessionRail({ sessions, categories, sources, selectedId, collapsed, onSelect, onNewSession, onCreateCategory, onAssignProject }: {
     sessions: FocusSession[];
     categories: ProjectCategory[];
+    sources: ConversationSourceStatus[];
     selectedId: string;
     collapsed: boolean;
     onSelect: (id: string) => void;
@@ -224,19 +393,51 @@ function SessionRail({ sessions, categories, selectedId, collapsed, onSelect, on
 }): React.ReactElement {
     const [collapsedProjects, setCollapsedProjects] = useState<ReadonlySet<string>>(() => new Set());
     const [collapsedCategories, setCollapsedCategories] = useState<ReadonlySet<string>>(() => new Set());
+    const [collapsedProviders, setCollapsedProviders] = useState<ReadonlySet<ConversationProvider>>(
+        () => new Set(EXTERNAL_PROVIDER_ORDER)
+    );
     const [draggedProject, setDraggedProject] = useState<string | undefined>();
     const [dropCategoryId, setDropCategoryId] = useState<string | undefined>();
+    const initializedExternalProjects = useRef(new Set<string>());
+    const projectDragCleanupRef = useRef<(() => void) | undefined>();
     const groups = useMemo(() => {
         const result = new Map<string, FocusSession[]>();
-        sessions.forEach(session => {
+        sessions.filter(session => session.provider === 'erebus').forEach(session => {
             const group = result.get(session.workspace) ?? [];
             group.push(session);
             result.set(session.workspace, group);
         });
         return Array.from(result.entries());
     }, [sessions]);
+    const externalGroups = useMemo(() => {
+        const result = new Map<ConversationProvider, Map<string, FocusSession[]>>();
+        EXTERNAL_PROVIDER_ORDER.forEach(provider => result.set(provider, new Map()));
+        sessions.filter(session => session.provider !== 'erebus').forEach(session => {
+            const provider = session.provider as ConversationProvider;
+            const providerGroups = result.get(provider) ?? new Map<string, FocusSession[]>();
+            const workspaceSessions = providerGroups.get(session.workspace) ?? [];
+            workspaceSessions.push(session);
+            providerGroups.set(session.workspace, workspaceSessions);
+            result.set(provider, providerGroups);
+        });
+        return result;
+    }, [sessions]);
     const categorizedProjects = useMemo(() => new Set(categories.flatMap(category => category.projects)), [categories]);
     const ungroupedProjects = groups.filter(([workspace]) => !categorizedProjects.has(workspace));
+
+    useEffect(() => {
+        const newProjectKeys: string[] = [];
+        externalGroups.forEach((providerProjects, provider) => providerProjects.forEach((_sessions, workspace) => {
+            const key = `${provider}:${workspace}`;
+            if (!initializedExternalProjects.current.has(key)) {
+                initializedExternalProjects.current.add(key);
+                newProjectKeys.push(key);
+            }
+        }));
+        if (newProjectKeys.length > 0) {
+            setCollapsedProjects(current => new Set([...current, ...newProjectKeys]));
+        }
+    }, [externalGroups]);
 
     const toggleProject = (workspace: string): void => {
         setCollapsedProjects(current => {
@@ -262,10 +463,16 @@ function SessionRail({ sessions, categories, selectedId, collapsed, onSelect, on
         });
     };
 
-    const beginProjectDrag = (event: React.DragEvent<HTMLElement>, workspace: string): void => {
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', workspace);
-        setDraggedProject(workspace);
+    const toggleProvider = (provider: ConversationProvider): void => {
+        setCollapsedProviders(current => {
+            const next = new Set(current);
+            if (next.has(provider)) {
+                next.delete(provider);
+            } else {
+                next.add(provider);
+            }
+            return next;
+        });
     };
 
     const endProjectDrag = (): void => {
@@ -273,21 +480,76 @@ function SessionRail({ sessions, categories, selectedId, collapsed, onSelect, on
         setDropCategoryId(undefined);
     };
 
-    const getDroppedProject = (event: React.DragEvent<HTMLElement>): string | undefined =>
-        draggedProject ?? (event.dataTransfer.getData('text/plain') || undefined);
+    useEffect(() => () => projectDragCleanupRef.current?.(), []);
 
-    const renderProject = (workspace: string, workspaceSessions: FocusSession[], categoryName?: string): React.ReactElement => {
-        const projectCollapsed = collapsedProjects.has(workspace);
+    const beginProjectDrag = (event: React.PointerEvent<HTMLElement>, workspace: string): void => {
+        if (event.button !== 0) {
+            return;
+        }
+        event.preventDefault();
+        projectDragCleanupRef.current?.();
+        const startX = event.clientX;
+        const startY = event.clientY;
+        let started = false;
+
+        const categoryAtPoint = (x: number, y: number): string | undefined =>
+            document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-category-id]')?.dataset.categoryId;
+        const cleanup = (): void => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', drop);
+            window.removeEventListener('pointercancel', cancel);
+            projectDragCleanupRef.current = undefined;
+        };
+        const move = (moveEvent: PointerEvent): void => {
+            if (!started && Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) >= 5) {
+                started = true;
+                setDraggedProject(workspace);
+            }
+            if (started) {
+                moveEvent.preventDefault();
+                setDropCategoryId(categoryAtPoint(moveEvent.clientX, moveEvent.clientY));
+            }
+        };
+        const drop = (dropEvent: PointerEvent): void => {
+            cleanup();
+            if (started) {
+                const categoryId = categoryAtPoint(dropEvent.clientX, dropEvent.clientY);
+                if (categoryId) {
+                    onAssignProject(categoryId, workspace);
+                } else if (document.elementFromPoint(dropEvent.clientX, dropEvent.clientY)?.closest('[data-new-category]')) {
+                    onCreateCategory(workspace);
+                }
+            }
+            endProjectDrag();
+        };
+        const cancel = (): void => {
+            cleanup();
+            endProjectDrag();
+        };
+
+        projectDragCleanupRef.current = cleanup;
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', drop);
+        window.addEventListener('pointercancel', cancel);
+    };
+
+    const renderProject = (
+        workspace: string,
+        workspaceSessions: FocusSession[],
+        categoryName?: string,
+        provider: 'erebus' | ConversationProvider = 'erebus'
+    ): React.ReactElement => {
+        const projectKey = `${provider}:${workspace}`;
+        const projectCollapsed = collapsedProjects.has(projectKey);
         const projectSessionsId = `erebus-project-sessions-${workspaceSessions[0].id}`;
         const projectLabel = categoryName ? `${categoryName} | ${workspace}` : workspace;
-        return <section className={`erebus-project-group${draggedProject === workspace ? ' is-dragging' : ''}`} key={workspace}>
+        const draggable = provider === 'erebus';
+        return <section className={`erebus-project-group${draggedProject === workspace ? ' is-dragging' : ''}`} key={projectKey}>
             {!collapsed && <div className='erebus-project-heading'>
                 <span
                     className='erebus-project-name'
-                    draggable
-                    onDragStart={event => beginProjectDrag(event, workspace)}
-                    onDragEnd={endProjectDrag}
-                    title={`Drag ${workspace} into a category`}
+                    onPointerDown={draggable ? event => beginProjectDrag(event, workspace) : undefined}
+                    title={draggable ? `Drag ${workspace} into a category` : workspace}
                 >
                     <Icon name='codicon-folder' />
                     <span>{projectLabel}</span>
@@ -295,7 +557,7 @@ function SessionRail({ sessions, categories, selectedId, collapsed, onSelect, on
                 <button
                     type='button'
                     className='erebus-project-toggle'
-                    onClick={() => toggleProject(workspace)}
+                    onClick={() => toggleProject(projectKey)}
                     aria-controls={projectSessionsId}
                     aria-expanded={!projectCollapsed}
                     aria-label={`${projectCollapsed ? 'Expand' : 'Collapse'} ${projectLabel} sessions`}
@@ -308,7 +570,7 @@ function SessionRail({ sessions, categories, selectedId, collapsed, onSelect, on
                 className={`erebus-project-sessions${projectCollapsed ? ' is-collapsed' : ''}`}
                 aria-hidden={projectCollapsed}
             >
-                {workspaceSessions.map(session => <SessionRow
+                {!projectCollapsed && workspaceSessions.map(session => <SessionRow
                     key={session.id}
                     session={session}
                     active={selectedId === session.id}
@@ -340,27 +602,7 @@ function SessionRail({ sessions, categories, selectedId, collapsed, onSelect, on
                     return <section
                         className={`erebus-project-category${dropActive ? ' is-drop-target' : ''}`}
                         key={category.id}
-                        onDragEnter={event => {
-                            event.preventDefault();
-                            setDropCategoryId(category.id);
-                        }}
-                        onDragOver={event => {
-                            event.preventDefault();
-                            event.dataTransfer.dropEffect = 'move';
-                        }}
-                        onDragLeave={event => {
-                            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                                setDropCategoryId(undefined);
-                            }
-                        }}
-                        onDrop={event => {
-                            event.preventDefault();
-                            const project = getDroppedProject(event);
-                            if (project) {
-                                onAssignProject(category.id, project);
-                            }
-                            endProjectDrag();
-                        }}
+                        data-category-id={category.id}
                     >
                         <div className='erebus-category-heading'>
                             <span><Icon name={dropActive ? 'codicon-folder-opened' : 'codicon-folder'} />{category.name}</span>
@@ -388,29 +630,60 @@ function SessionRail({ sessions, categories, selectedId, collapsed, onSelect, on
                     </section>;
                 })}
                 {ungroupedProjects.map(([workspace, workspaceSessions]) => renderProject(workspace, workspaceSessions))}
+                {!collapsed && <button
+                    type='button'
+                    className={`erebus-new-category${draggedProject ? ' is-drop-target' : ''}`}
+                    data-new-category
+                    onClick={() => onCreateCategory()}
+                >
+                    <Icon name={draggedProject ? 'codicon-new-folder' : 'codicon-add'} />
+                    {draggedProject ? 'Drop to create category' : 'New category'}
+                </button>}
+                {(Array.from(externalGroups.entries())).map(([provider, providerProjects]) => {
+                    const status = sources.find(source => source.provider === provider);
+                    const providerSessions = [...providerProjects.values()].flat();
+                    const providerCollapsed = collapsedProviders.has(provider);
+                    const providerContentId = `erebus-provider-content-${provider}`;
+                    return <section className={`erebus-provider-group${providerCollapsed ? ' is-collapsed' : ''}`} key={provider}>
+                        {!collapsed && <button
+                            type='button'
+                            className='erebus-provider-heading'
+                            onClick={() => toggleProvider(provider)}
+                            aria-controls={providerContentId}
+                            aria-expanded={!providerCollapsed}
+                            aria-label={`${providerCollapsed ? 'Expand' : 'Collapse'} ${providerLabels[provider]} conversations`}
+                            title={`${providerCollapsed ? 'Expand' : 'Collapse'} ${providerLabels[provider]} conversations`}
+                        >
+                            <span className={`erebus-provider-mark is-${provider}`}>{providerMonograms[provider]}</span>
+                            <strong>{providerLabels[provider]}</strong>
+                            <span>{providerSessions.length}</span>
+                        </button>}
+                        <div
+                            id={providerContentId}
+                            className={`erebus-provider-content${providerCollapsed ? ' is-collapsed' : ''}`}
+                            aria-hidden={providerCollapsed}
+                        >
+                            {!providerCollapsed && (providerProjects.size > 0
+                                ? [...providerProjects.entries()]
+                                    .sort(([left], [right]) => {
+                                        if (left === 'Uncategorized') {
+                                            return 1;
+                                        }
+                                        if (right === 'Uncategorized') {
+                                            return -1;
+                                        }
+                                        return left.localeCompare(right);
+                                    })
+                                    .map(([workspace, workspaceSessions]) =>
+                                    renderProject(workspace, workspaceSessions, undefined, provider))
+                                : !collapsed && <div className='erebus-provider-empty'>
+                                    {status?.message ?? `No ${providerLabels[provider]} conversations found.`}
+                                </div>)}
+                        </div>
+                    </section>;
+                })}
             </div>
 
-            {!collapsed && <button
-                type='button'
-                className={`erebus-new-category${draggedProject ? ' is-drop-target' : ''}`}
-                onClick={() => onCreateCategory()}
-                onDragOver={event => {
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = 'move';
-                }}
-                onDrop={event => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const project = getDroppedProject(event);
-                    if (project) {
-                        onCreateCategory(project);
-                    }
-                    endProjectDrag();
-                }}
-            >
-                <Icon name={draggedProject ? 'codicon-new-folder' : 'codicon-add'} />
-                {draggedProject ? 'Drop to create category' : 'New category'}
-            </button>}
         </div>
 
         <div className='erebus-profile'>
@@ -440,7 +713,9 @@ function RailResizeHandle({ width, onResize }: { width: number; onResize: (width
         aria-valuemin={MIN_RAIL_WIDTH}
         aria-valuemax={MAX_RAIL_WIDTH}
         aria-valuenow={Math.round(width)}
+        title='Drag to resize; double-click to reset'
         tabIndex={0}
+        onDoubleClick={() => onResize(DEFAULT_RAIL_WIDTH)}
         onPointerDown={event => {
             if (event.button !== 0) {
                 return;
@@ -508,15 +783,16 @@ function ChangeSummary({ files, onOpenChanges }: { files: string[]; onOpenChange
     </div>;
 }
 
-function ConversationMessage({ message, expanded, onToggleTools, onOpenChanges }: {
+function ConversationMessage({ message, agentName, expanded, onToggleTools, onOpenChanges }: {
     message: FocusMessage;
+    agentName: string;
     expanded: boolean;
     onToggleTools: () => void;
     onOpenChanges: () => void;
 }): React.ReactElement {
     if (message.role === 'user') {
         return <article className='erebus-message is-user'>
-            <div className='erebus-user-bubble'>{message.body.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
+            <MarkdownContent markdown={message.body.join('\n\n')} className='erebus-user-bubble' />
         </article>;
     }
 
@@ -524,12 +800,10 @@ function ConversationMessage({ message, expanded, onToggleTools, onOpenChanges }
         {message.toolCalls && <ToolDisclosure count={message.toolCalls} expanded={expanded} onToggle={onToggleTools} />}
         <header className='erebus-agent-heading'>
             <AgentMark />
-            <strong>Erebus</strong>
+            <strong>{agentName}</strong>
             <span>Agent</span>
         </header>
-        <div className='erebus-agent-copy'>
-            {message.body.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
-        </div>
+        <MarkdownContent markdown={message.body.join('\n\n')} className='erebus-agent-copy' />
         {message.elapsed && <div className='erebus-message-metrics'>
             <span>Elapsed {message.elapsed}</span>
             <span>Local session</span>
@@ -541,53 +815,100 @@ function ConversationMessage({ message, expanded, onToggleTools, onOpenChanges }
 function EmptyConversation({ session }: { session: FocusSession }): React.ReactElement {
     return <div className='erebus-empty-conversation'>
         <div className='erebus-empty-orbit'><AgentMark /></div>
-        <span className='erebus-eyebrow'>Ready to work</span>
+        <span className='erebus-eyebrow'>{session.readOnly ? 'Synced conversation' : 'Ready to work'}</span>
         <h2>{session.title}</h2>
-        <p>Describe an outcome, attach context, or select a structured workflow. Erebus will keep the session visible while it works.</p>
+        <p>{session.readOnly
+            ? session.loading ? `Loading this ${providerLabels[session.provider as ConversationProvider]} conversation…`
+                : 'This conversation does not contain any displayable user or agent messages.'
+            : 'Describe an outcome, attach context, or select a structured workflow. Erebus will keep the session visible while it works.'}</p>
     </div>;
 }
 
-function Composer({ value, busy, onChange, onSubmit }: {
+function Composer({ value, busy, readOnly, providerName, onChange, onSubmit }: {
     value: string;
     busy: boolean;
+    readOnly: boolean;
+    providerName?: string;
     onChange: (value: string) => void;
     onSubmit: () => void;
 }): React.ReactElement {
+    const [previewing, setPreviewing] = useState(false);
+
+    useEffect(() => {
+        if (!value) {
+            setPreviewing(false);
+        }
+    }, [value]);
+
     return <div className='erebus-composer-wrap'>
-        <div className={`erebus-composer${busy ? ' is-busy' : ''}`}>
-            <textarea
-                rows={2}
-                value={value}
-                onChange={event => onChange(event.target.value)}
-                onKeyDown={event => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault();
-                        onSubmit();
-                    }
-                }}
-                placeholder='Ask a question or describe a task…'
-                aria-label='Message the agent'
-            />
+        <div className={`erebus-composer${busy ? ' is-busy' : ''}${readOnly ? ' is-read-only' : ''}`}>
+            <div className='erebus-composer-editor'>
+                {previewing ? <MarkdownContent
+                    markdown={value}
+                    className='erebus-composer-preview'
+                    onCodeLanguageChange={(codeBlockIndex, language) =>
+                        onChange(updateFencedCodeLanguage(value, codeBlockIndex, language))}
+                /> : <textarea
+                    rows={2}
+                    value={value}
+                    disabled={readOnly}
+                    onChange={event => onChange(event.target.value)}
+                    onKeyDown={event => {
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                            const continuation = continueMarkdownOnEnter(
+                                value,
+                                event.currentTarget.selectionStart,
+                                event.currentTarget.selectionEnd
+                            );
+                            event.preventDefault();
+                            if (continuation) {
+                                onChange(continuation.value);
+                                const textarea = event.currentTarget;
+                                window.requestAnimationFrame(() => textarea.setSelectionRange(
+                                    continuation.selectionStart,
+                                    continuation.selectionStart
+                                ));
+                            } else {
+                                onSubmit();
+                            }
+                        }
+                    }}
+                    placeholder={readOnly ? `Read-only sync from ${providerName}` : 'Ask a question or describe a task…'}
+                    aria-label='Message the agent'
+                />}
+            </div>
             <div className='erebus-composer-toolbar'>
                 <div className='erebus-composer-tools'>
-                    <button type='button' aria-label='Add context' title='Add context'><Icon name='codicon-add' /></button>
-                    <button type='button' aria-label='Attach file' title='Attach file'><Icon name='codicon-attach' /></button>
-                    <button type='button' className='erebus-select-button'>
-                        <AgentMark small />Erebus Agent<Icon name='codicon-chevron-down' />
+                    <button type='button' disabled={readOnly} aria-label='Add context' title='Add context'><Icon name='codicon-add' /></button>
+                    <button type='button' disabled={readOnly} aria-label='Attach file' title='Attach file'><Icon name='codicon-attach' /></button>
+                    <button
+                        type='button'
+                        className={`erebus-markdown-toggle${previewing ? ' is-active' : ''}`}
+                        disabled={readOnly || !value}
+                        aria-label={previewing ? 'Edit Markdown' : 'Preview Markdown'}
+                        aria-pressed={previewing}
+                        title={previewing ? 'Edit Markdown' : 'Preview Markdown'}
+                        onClick={() => setPreviewing(current => !current)}
+                    >
+                        <Icon name={previewing ? 'codicon-edit' : 'codicon-preview'} />
+                        <span>{previewing ? 'Write' : 'Preview'}</span>
                     </button>
-                    <button type='button' className='erebus-select-button'>Balanced<Icon name='codicon-chevron-down' /></button>
+                    <button type='button' className='erebus-select-button' disabled={readOnly}>
+                        <AgentMark small />{readOnly ? providerName : 'Erebus Agent'}<Icon name='codicon-chevron-down' />
+                    </button>
+                    <button type='button' className='erebus-select-button' disabled={readOnly}>Balanced<Icon name='codicon-chevron-down' /></button>
                 </div>
                 <div className='erebus-composer-actions'>
                     <label className='erebus-autopilot-toggle'>
                         <span>Autopilot</span>
-                        <input type='checkbox' defaultChecked />
+                        <input type='checkbox' defaultChecked disabled={readOnly} />
                         <span className='erebus-toggle-track'><span /></span>
                     </label>
                     <button
                         type='button'
                         className='erebus-send-button'
                         onClick={onSubmit}
-                        disabled={!value.trim() || busy}
+                        disabled={readOnly || !value.trim() || busy}
                         aria-label={busy ? 'Agent is working' : 'Send message'}
                         title={busy ? 'Agent is working' : 'Send message'}
                     >
@@ -596,7 +917,9 @@ function Composer({ value, busy, onChange, onSubmit }: {
                 </div>
             </div>
         </div>
-        <div className='erebus-composer-hint'>Enter to send · Shift+Enter for a new line</div>
+        <div className='erebus-composer-hint'>{readOnly
+            ? `Read-only local sync · Continue this thread in ${providerName}`
+            : 'Enter to send · Shift+Enter for a new line'}</div>
     </div>;
 }
 
@@ -822,12 +1145,14 @@ function NewCategoryDialog({ project, categoryNames, onClose, onCreate }: {
     </div>;
 }
 
-function TopBar({ session, railCollapsed, contextOpen, attentionCount, onToggleRail, onToggleContext, onToggleAttention, onExitFocusMode }: {
+function TopBar({ session, railCollapsed, contextOpen, attentionCount, refreshing, onToggleRail, onRefresh, onToggleContext, onToggleAttention, onExitFocusMode }: {
     session: FocusSession;
     railCollapsed: boolean;
     contextOpen: boolean;
     attentionCount: number;
+    refreshing: boolean;
     onToggleRail: () => void;
+    onRefresh: () => void;
     onToggleContext: () => void;
     onToggleAttention: () => void;
     onExitFocusMode: () => void;
@@ -840,8 +1165,20 @@ function TopBar({ session, railCollapsed, contextOpen, attentionCount, onToggleR
                 <Icon name={railCollapsed ? 'codicon-layout-sidebar-left' : 'codicon-layout-sidebar-left-off'} />
             </button>
             <span className='erebus-topbar-divider' />
-            <button type='button' className='erebus-icon-button' aria-label='Go back' title='Back'><Icon name='codicon-arrow-left' /></button>
-            <button type='button' className='erebus-icon-button' aria-label='Go forward' title='Forward'><Icon name='codicon-arrow-right' /></button>
+            <button type='button' className='erebus-icon-button erebus-navigation-control' aria-label='Go back' title='Back'><Icon name='codicon-arrow-left' /></button>
+            <button type='button' className='erebus-icon-button erebus-navigation-control' aria-label='Go forward' title='Forward'><Icon name='codicon-arrow-right' /></button>
+            <span className='erebus-topbar-divider' />
+            <button
+                type='button'
+                className='erebus-icon-button erebus-navigation-control'
+                onClick={onRefresh}
+                disabled={refreshing}
+                aria-label={refreshing ? 'Refreshing view' : 'Refresh view'}
+                aria-busy={refreshing}
+                title={refreshing ? 'Refreshing…' : 'Refresh'}
+            >
+                <Icon name='codicon-refresh' className={refreshing ? 'codicon-modifier-spin' : ''} />
+            </button>
         </div>
 
         <div className='erebus-topbar-title' onDoubleClick={toggleElectronWindowMaximized}
@@ -870,9 +1207,10 @@ function TopBar({ session, railCollapsed, contextOpen, attentionCount, onToggleR
     </header>;
 }
 
-export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.ReactElement {
+export function AgentFocusView({ conversationSyncService, onExitFocusMode }: AgentFocusViewProps): React.ReactElement {
     const [sessions, setSessions] = useState<FocusSession[]>(SEED_SESSIONS);
     const [selectedId, setSelectedId] = useState(SEED_SESSIONS[0].id);
+    const [conversationSources, setConversationSources] = useState<ConversationSourceStatus[]>([]);
     const [railWidth, setRailWidth] = useState(loadRailWidth);
     const [categories, setCategories] = useState<ProjectCategory[]>(loadProjectCategories);
     const [railCollapsed, setRailCollapsed] = useState(() => {
@@ -891,10 +1229,107 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
     const [busy, setBusy] = useState(false);
     const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set(['focus-agent-2']));
     const [toast, setToast] = useState<string | undefined>();
+    const [refreshing, setRefreshing] = useState(false);
     const chatEndRef = useRef<HTMLDivElement | undefined>(undefined);
+    const selectedIdRef = useRef(selectedId);
+    const loadedConversationVersions = useRef(new Map<string, string>());
+    const refreshInFlight = useRef(false);
 
     const selectedSession = sessions.find(session => session.id === selectedId) ?? sessions[0];
     const attentionCount = sessions.filter(session => session.status === 'attention').length;
+
+    const loadSyncedConversation = async (
+        provider: ConversationProvider,
+        externalId: string,
+        sessionId: string,
+        expectedUpdatedAt: string
+    ): Promise<void> => {
+        setSessions(current => current.map(session => session.id === sessionId ? { ...session, loading: true } : session));
+        try {
+            const detail = await conversationSyncService.readConversation(provider, externalId);
+            if (!detail) {
+                throw new Error(`${providerLabels[provider]} conversation ${externalId} is no longer available.`);
+            }
+            loadedConversationVersions.current.set(sessionId, detail.updatedAt || expectedUpdatedAt);
+            setSessions(current => current.map(session => session.id === sessionId ? applyConversationDetail(session, detail) : session));
+        } catch (error) {
+            console.error(`Failed to load ${providerLabels[provider]} conversation`, error);
+            setSessions(current => current.map(session => session.id === sessionId ? { ...session, loading: false } : session));
+            setToast(`Could not load the ${providerLabels[provider]} conversation`);
+        }
+    };
+
+    useEffect(() => {
+        selectedIdRef.current = selectedId;
+    }, [selectedId]);
+
+    useEffect(() => {
+        let disposed = false;
+        const refresh = async (): Promise<void> => {
+            try {
+                const snapshot = await conversationSyncService.listConversations();
+                if (disposed) {
+                    return;
+                }
+                setConversationSources(current => reconcileConversationSources(current, snapshot.sources));
+                setSessions(current => reconcileSyncedSessions(current, snapshot.conversations));
+
+                const selectedSummary = snapshot.conversations.find(summary =>
+                    `${summary.provider}:${summary.id}` === selectedIdRef.current);
+                if (selectedSummary
+                    && loadedConversationVersions.current.get(selectedIdRef.current) !== selectedSummary.updatedAt) {
+                    await loadSyncedConversation(
+                        selectedSummary.provider,
+                        selectedSummary.id,
+                        selectedIdRef.current,
+                        selectedSummary.updatedAt
+                    );
+                }
+            } catch (error) {
+                console.error('Failed to synchronize external conversations', error);
+                if (!disposed) {
+                    setToast('External conversation sync is unavailable');
+                }
+            }
+        };
+        refresh().catch(error => console.error(error));
+        const interval = window.setInterval(() => refresh().catch(error => console.error(error)), CONVERSATION_SYNC_INTERVAL_MS);
+        return () => {
+            disposed = true;
+            window.clearInterval(interval);
+        };
+    }, [conversationSyncService]);
+
+    const refreshView = async (): Promise<void> => {
+        if (refreshInFlight.current) {
+            return;
+        }
+        refreshInFlight.current = true;
+        setRefreshing(true);
+        try {
+            const snapshot = await conversationSyncService.listConversations(true);
+            setConversationSources(current => reconcileConversationSources(current, snapshot.sources));
+            setSessions(current => reconcileSyncedSessions(current, snapshot.conversations));
+
+            const selectedSummary = snapshot.conversations.find(summary =>
+                `${summary.provider}:${summary.id}` === selectedIdRef.current);
+            if (selectedSummary
+                && loadedConversationVersions.current.get(selectedIdRef.current) !== selectedSummary.updatedAt) {
+                await loadSyncedConversation(
+                    selectedSummary.provider,
+                    selectedSummary.id,
+                    selectedIdRef.current,
+                    selectedSummary.updatedAt
+                );
+            }
+        } catch (error) {
+            console.error('Failed to refresh Agent Focus', error);
+            setToast('Could not refresh Agent Focus');
+        } finally {
+            refreshInFlight.current = false;
+            setRefreshing(false);
+        }
+    };
 
     useEffect(() => {
         try {
@@ -937,9 +1372,20 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
     };
 
     const selectSession = (sessionId: string): void => {
+        selectedIdRef.current = sessionId;
         setSelectedId(sessionId);
         setContextTab('context');
         setComposer('');
+        const session = sessions.find(candidate => candidate.id === sessionId);
+        if (session?.readOnly && session.externalId && session.sourceUpdatedAt
+            && loadedConversationVersions.current.get(sessionId) !== session.sourceUpdatedAt) {
+            loadSyncedConversation(
+                session.provider as ConversationProvider,
+                session.externalId,
+                sessionId,
+                session.sourceUpdatedAt
+            ).catch(error => console.error(error));
+        }
     };
 
     const openChanges = (): void => {
@@ -949,7 +1395,7 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
 
     const submitMessage = (): void => {
         const trimmed = composer.trim();
-        if (!trimmed || busy) {
+        if (!trimmed || busy || selectedSession.readOnly) {
             return;
         }
 
@@ -997,6 +1443,7 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
         const title = workflow ? `${workflow} — Untitled task` : 'Untitled agent session';
         const session: FocusSession = {
             id,
+            provider: 'erebus',
             workspace: 'Erebus',
             title,
             summary: workflow ? `${workflow} workflow ready` : 'Ready for a new direction',
@@ -1074,7 +1521,9 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
             railCollapsed={railCollapsed}
             contextOpen={contextOpen}
             attentionCount={attentionCount}
+            refreshing={refreshing}
             onToggleRail={() => setRailCollapsed(current => !current)}
+            onRefresh={() => refreshView().catch(error => console.error(error))}
             onToggleContext={() => setContextOpen(current => !current)}
             onToggleAttention={() => setAttentionOpen(current => !current)}
             onExitFocusMode={onExitFocusMode}
@@ -1084,6 +1533,7 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
             <SessionRail
                 sessions={sessions}
                 categories={categories}
+                sources={conversationSources}
                 selectedId={selectedSession.id}
                 collapsed={railCollapsed}
                 onSelect={selectSession}
@@ -1100,6 +1550,9 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
                         {selectedSession.messages.length === 0 ? <EmptyConversation session={selectedSession} /> : selectedSession.messages.map(message => <ConversationMessage
                             key={message.id}
                             message={message}
+                            agentName={selectedSession.provider === 'erebus'
+                                ? 'Erebus'
+                                : providerLabels[selectedSession.provider as ConversationProvider]}
                             expanded={expandedTools.has(message.id)}
                             onToggleTools={() => setExpandedTools(current => {
                                 const next = new Set(current);
@@ -1112,6 +1565,14 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
                             })}
                             onOpenChanges={openChanges}
                         />)}
+                        {Boolean(selectedSession.truncatedMessages) && <div className='erebus-history-truncated'>
+                            Showing the latest {selectedSession.messages.length} messages. {selectedSession.truncatedMessages} earlier messages remain in the source conversation.
+                        </div>}
+                        {selectedSession.loading && <div className='erebus-agent-working'>
+                            <AgentMark small />
+                            <span>Synchronizing {providerLabels[selectedSession.provider as ConversationProvider]}</span>
+                            <span className='erebus-working-dots'><i /><i /><i /></span>
+                        </div>}
                         {busy && <div className='erebus-agent-working'>
                             <AgentMark small />
                             <span>Erebus is working</span>
@@ -1120,7 +1581,16 @@ export function AgentFocusView({ onExitFocusMode }: AgentFocusViewProps): React.
                         <div ref={element => chatEndRef.current = element ?? undefined} />
                     </div>
                 </div>
-                <Composer value={composer} busy={busy} onChange={setComposer} onSubmit={submitMessage} />
+                <Composer
+                    value={composer}
+                    busy={busy}
+                    readOnly={Boolean(selectedSession.readOnly)}
+                    providerName={selectedSession.provider === 'erebus'
+                        ? undefined
+                        : providerLabels[selectedSession.provider as ConversationProvider]}
+                    onChange={setComposer}
+                    onSubmit={submitMessage}
+                />
             </main>
 
             {contextOpen && <ContextPanel

@@ -14,7 +14,8 @@ import { FrontendApplicationContribution, WidgetFactory } from '@theia/core/lib/
 import { AboutDialog } from '@theia/core/lib/browser/about-dialog';
 import { applyBranding } from './theia-ide-config';
 import { CommandContribution } from '@theia/core/lib/common/command';
-import { ContainerModule } from '@theia/core/shared/inversify';
+import { ContainerModule, injectable } from '@theia/core/shared/inversify';
+import { GettingStartedContribution } from '@theia/getting-started/lib/browser/getting-started-contribution';
 import { GettingStartedWidget } from '@theia/getting-started/lib/browser/getting-started-widget';
 import { MenuContribution } from '@theia/core/lib/common/menu';
 import { TheiaIDEAboutDialog } from './theia-ide-about-dialog';
@@ -22,8 +23,20 @@ import { TheiaIDEAIRegistryConfiguration } from './theia-ide-ai-registry-configu
 import { TheiaIDEContribution } from './theia-ide-contribution';
 import { TheiaIDEGettingStartedWidget } from './theia-ide-getting-started-widget';
 
+@injectable()
+class ErebusGettingStartedContribution extends GettingStartedContribution {
+    override onStart(): Promise<void> {
+        // Agent Focus owns startup. Welcome remains available through its command.
+        return Promise.resolve();
+    }
+}
+
 export default new ContainerModule((bind, _unbind, isBound, rebind) => {
     applyBranding();
+
+    if (isBound(GettingStartedContribution)) {
+        rebind(GettingStartedContribution).to(ErebusGettingStartedContribution).inSingletonScope();
+    }
 
     bind(TheiaIDEGettingStartedWidget).toSelf();
     bind(WidgetFactory).toDynamicValue(context => ({

@@ -11,7 +11,7 @@ export type SessionStatus = 'working' | 'attention' | 'paused' | 'complete';
 
 export type SessionKind = 'local' | 'cloud' | 'cli';
 
-export type SessionProvider = 'erebus' | 'codex' | 'kiro';
+export type SessionProvider = 'erebus' | 'claude' | 'codex' | 'kiro';
 
 export type MessageRole = 'user' | 'agent';
 

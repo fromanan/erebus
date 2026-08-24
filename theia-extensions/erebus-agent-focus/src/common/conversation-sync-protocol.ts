@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: MIT
  ********************************************************************************/
 
-export type ConversationProvider = 'codex' | 'kiro';
+export type ConversationProvider = 'claude' | 'codex' | 'kiro';
 
 export interface SyncedConversationMessage {
     id: string;
@@ -49,9 +49,9 @@ export const ConversationSyncService = Symbol('ConversationSyncService');
 
 /**
  * Read-only access to conversation data owned by external agent products.
- * Erebus never writes to Codex or Kiro storage through this service.
+ * Erebus never writes to Claude, Codex, or Kiro storage through this service.
  */
 export interface ConversationSyncService {
-    listConversations(): Promise<ConversationSyncSnapshot>;
+    listConversations(force?: boolean): Promise<ConversationSyncSnapshot>;
     readConversation(provider: ConversationProvider, id: string): Promise<SyncedConversationDetail | undefined>;
 }
